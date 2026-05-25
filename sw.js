@@ -1,4 +1,4 @@
-const CACHE = 'budget-v1';
+const CACHE = 'budget-v2';
 const FILES = [
   '/budget/',
   '/budget/index.html',
@@ -15,7 +15,7 @@ self.addEventListener('install', e => {
 
 self.addEventListener('activate', e => {
   e.waitUntil(
-    caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))
+    caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())
   );
 });
 

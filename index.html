@@ -870,7 +870,19 @@
 
     // Register Service Worker for offline
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/budget/sw.js');
+      navigator.serviceWorker.register('/budget/sw.js').then(reg => {
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'activated' && !navigator.serviceWorker.controller) {
+              location.reload();
+            }
+          });
+        });
+      });
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        location.reload();
+      });
     }
   </script>
 </body>
