@@ -958,9 +958,7 @@
 
     // Register Service Worker for offline
     if ('serviceWorker' in navigator) {
-      let swReg = null;
       navigator.serviceWorker.register('/budget/sw.js').then(reg => {
-        swReg = reg;
         // Check for updates every 30 minutes
         setInterval(() => { reg.update(); }, 30 * 60 * 1000);
 
@@ -972,9 +970,6 @@
             }
           });
         });
-      });
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        location.reload();
       });
     }
   </script>
