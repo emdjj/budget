@@ -150,7 +150,8 @@
       <h1>📒 记账助手</h1>
       <div class="header-actions">
         <button class="header-btn" id="summaryBtn" title="查看统计" aria-label="查看统计">📊</button>
-        <button class="header-btn" id="clearBtn" title="新的一天" aria-label="重置">🔄</button>
+        <button class="header-btn" id="refreshBtn" title="强制刷新" aria-label="强制刷新" style="font-size:14px">🔄</button>
+        <button class="header-btn" id="clearBtn" title="新的一天" aria-label="重置">📋</button>
       </div>
     </header>
 
@@ -405,6 +406,7 @@
     // ============================================================
     //  State
     // ============================================================
+    const APP_VERSION = '2.1';
     let records = [];
     let isRecording = false;
     let recognition = null;
@@ -556,6 +558,22 @@
       toastEl.classList.add('show');
       clearTimeout(toastTimer);
       toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2000);
+    }
+
+    async function forceRefresh() {
+      if (!confirm('强制刷新将清除缓存并重新加载页面，继续？')) return;
+      // Unregister all service workers
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const reg of regs) await reg.unregister();
+      }
+      // Clear all caches
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+      }
+      showToast('已清除缓存，重新加载...');
+      setTimeout(() => location.reload(), 500);
     }
 
     function scrollToBottom() { setTimeout(() => { msgContainer.scrollTop = msgContainer.scrollHeight; }, 50); }
@@ -777,6 +795,7 @@
       }
 
       html += `<button class="reset-btn" id="resetDataBtn" style="margin-top:12px">🗑️ 清除所有记录</button>`;
+      html += `<div style="text-align:center;font-size:11px;color:var(--text-secondary);margin-top:10px;padding-bottom:4px">v${APP_VERSION} · <a href="#" id="forceRefreshLink" style="color:var(--accent);text-decoration:none">强制刷新</a></div>`;
 
       sheetContent.innerHTML = html;
 
@@ -801,6 +820,8 @@
           showToast('已清除所有记录');
         }
       });
+      const refreshLink = sheetContent.querySelector('#forceRefreshLink');
+      if (refreshLink) refreshLink.addEventListener('click', e => { e.preventDefault(); forceRefresh(); });
     }
 
     function openSheet() { renderSummary(); sheet.classList.add('open'); sheetOverlay.classList.add('open'); }
@@ -808,6 +829,11 @@
     summaryBtn.addEventListener('click', openSheet);
     closeSheet.addEventListener('click', closeSheetFn);
     sheetOverlay.addEventListener('click', closeSheetFn);
+
+    // ============================================================
+    //  Force Refresh
+    // ============================================================
+    document.querySelector('#refreshBtn').addEventListener('click', forceRefresh);
 
     // ============================================================
     //  Clear / New Day
@@ -846,7 +872,7 @@
     sendBtn.addEventListener('click', () => { if (input.value.trim()) handleInput(input.value); });
 
     // ============================================================
-    //  Voice
+    //  Voice (with mobile-friendly auto-retry)
     // ============================================================
     function initVoice() {
       const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -855,33 +881,61 @@
       recognition.lang = 'zh-CN';
       recognition.continuous = false;
       recognition.interimResults = false;
+
+      let voiceStartTs = 0, gotResult = false, retryCount = 0;
+
+      recognition.onstart = () => { voiceStartTs = Date.now(); gotResult = false; };
+
       recognition.onresult = (e) => {
+        gotResult = true;
+        resetVoiceUI();
         const t = e.results[0][0].transcript;
-        voiceIndicator.classList.remove('active'); isRecording = false;
-        micBtn.classList.remove('recording'); micBase.style.display = ''; micStop.style.display = 'none';
+        if (!t.trim()) return;
         input.value = t; autoResize();
         setTimeout(() => handleInput(t), 300);
       };
+
       recognition.onerror = (e) => {
-        voiceIndicator.classList.remove('active'); isRecording = false;
-        micBtn.classList.remove('recording'); micBase.style.display = ''; micStop.style.display = 'none';
-        if (e.error === 'no-speech') showToast('没有检测到语音');
-        else if (e.error !== 'aborted') showToast('语音识别出错');
+        resetVoiceUI();
+        if (e.error === 'not-allowed') showToast('请允许麦克风权限');
+        else if (e.error === 'no-speech' && retryCount < 1 && Date.now() - voiceStartTs < 2000) {
+          retryCount++;
+          showToast('未听到语音，重试中...');
+          setTimeout(startVoice, 500);
+        } else if (e.error !== 'aborted') {
+          showToast('语音识别失败，请重试');
+        }
       };
+
       recognition.onend = () => {
+        if (isRecording) resetVoiceUI();
+        // Auto-retry if ended too quickly without a result (common on mobile)
+        if (!gotResult && retryCount < 1 && voiceStartTs > 0 && Date.now() - voiceStartTs < 2000) {
+          retryCount++;
+          setTimeout(startVoice, 500);
+        }
+      };
+
+      function resetVoiceUI() {
         voiceIndicator.classList.remove('active'); isRecording = false;
         micBtn.classList.remove('recording'); micBase.style.display = ''; micStop.style.display = 'none';
-      };
+      }
+
+      function startVoice() {
+        try {
+          recognition.start(); isRecording = true;
+          micBtn.classList.add('recording'); micBase.style.display = 'none'; micStop.style.display = '';
+          voiceIndicator.classList.add('active');
+        } catch(e) { showToast('请允许麦克风权限'); }
+      }
+
+      micBtn.addEventListener('click', () => {
+        if (!recognition) { showToast('当前浏览器不支持语音输入'); return; }
+        if (isRecording) { recognition.abort(); resetVoiceUI(); return; }
+        retryCount = 0;
+        startVoice();
+      });
     }
-    micBtn.addEventListener('click', () => {
-      if (!recognition) { showToast('当前浏览器不支持语音输入'); return; }
-      if (isRecording) { recognition.abort(); return; }
-      try {
-        recognition.start(); isRecording = true;
-        micBtn.classList.add('recording'); micBase.style.display = 'none'; micStop.style.display = '';
-        voiceIndicator.classList.add('active');
-      } catch { showToast('请允许麦克风权限'); }
-    });
 
     // ============================================================
     //  Init
@@ -904,12 +958,17 @@
 
     // Register Service Worker for offline
     if ('serviceWorker' in navigator) {
+      let swReg = null;
       navigator.serviceWorker.register('/budget/sw.js').then(reg => {
+        swReg = reg;
+        // Check for updates every 30 minutes
+        setInterval(() => { reg.update(); }, 30 * 60 * 1000);
+
         reg.addEventListener('updatefound', () => {
           const newWorker = reg.installing;
           newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'activated' && !navigator.serviceWorker.controller) {
-              location.reload();
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              showToast('新版已就绪，点击🔄刷新');
             }
           });
         });
