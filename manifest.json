@@ -2,7 +2,7 @@
   "name": "记账助手",
   "short_name": "记账",
   "description": "AI 语音记账助手",
-  "start_url": "/",
+  "start_url": "/budget/",
   "display": "standalone",
   "background_color": "#0f0f23",
   "theme_color": "#1a1a2e",
