@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#1a1a2e" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>记账助手</title>
+  <link rel="manifest" href="/manifest.json" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    :root {
+      --bg: #0f0f23; --surface: #1a1a2e; --card: #16213e; --accent: #4fc3f7;
+      --text: #e8e8e8; --text-secondary: #a0a0b8;
+      --border: #2a2a4a; --success: #66bb6a; --danger: #ef5350; --income: #4CAF50;
+    }
+    html, body { height: 100%; overflow: hidden; font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; background: var(--bg); color: var(--text); }
+
+    .app { display: flex; flex-direction: column; height: 100%; max-width: 480px; margin: 0 auto; position: relative; }
+
+    .header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .header h1 { font-size: 18px; font-weight: 600; }
+    .header-actions { display: flex; gap: 8px; }
+    .header-btn { background: none; border: 1px solid var(--border); color: var(--text); width: 36px; height: 36px; border-radius: 50%; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+    .header-btn:active { transform: scale(0.92); background: var(--card); }
+
+    .messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
+    .messages::-webkit-scrollbar { width: 4px; }
+    .messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .msg { display: flex; flex-direction: column; max-width: 88%; animation: fadeIn 0.3s ease; }
+    .msg.user { align-self: flex-end; }
+    .msg.assistant { align-self: flex-start; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .msg-bubble { padding: 10px 14px; border-radius: 16px; font-size: 15px; line-height: 1.6; word-break: break-word; }
+    .msg.user .msg-bubble { background: var(--accent); color: #000; border-bottom-right-radius: 4px; }
+    .msg.assistant .msg-bubble { background: var(--surface); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+    .msg-time { font-size: 11px; color: var(--text-secondary); margin-top: 4px; padding: 0 4px; }
+    .msg.user .msg-time { text-align: right; }
+
+    .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0; }
+    .summary-item { background: var(--card); border-radius: 10px; padding: 10px; text-align: center; }
+    .summary-item .num { font-size: 20px; font-weight: 700; }
+    .summary-item .lbl { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+    .summary-total { grid-column: 1 / -1; background: var(--surface); border: 1px solid var(--border); }
+    .summary-total .num { font-size: 24px; }
+
+    .chart-section { margin: 8px 0; }
+    .chart-bar-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 13px; }
+    .chart-bar-row .lbl { min-width: 2.8em; color: var(--text-secondary); }
+    .chart-bar-row .bar-track { flex: 1; height: 18px; background: var(--card); border-radius: 9px; overflow: hidden; }
+    .chart-bar-row .bar-fill { height: 100%; border-radius: 9px; min-width: 4px; transition: width 0.4s ease; }
+    .chart-bar-row .pct { min-width: 2.5em; text-align: right; font-weight: 500; }
+
+    .date-nav { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 12px; gap: 6px; flex-wrap: wrap; }
+    .date-nav .period-tabs { display: flex; gap: 2px; background: var(--card); border-radius: 8px; padding: 2px; }
+    .date-nav .period-tab { background: none; border: none; color: var(--text-secondary); padding: 4px 10px; border-radius: 6px; font-size: 13px; cursor: pointer; transition: 0.2s; }
+    .date-nav .period-tab.active { background: var(--accent); color: #000; font-weight: 600; }
+    .date-nav .period-tab:active { transform: scale(0.95); }
+    .date-nav .nav-center { display: flex; align-items: center; gap: 6px; }
+    .date-nav .nav-arrow { background: none; border: none; color: var(--text-secondary); width: 30px; height: 30px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: 0.2s; }
+    .date-nav .nav-arrow:active { background: var(--card); transform: scale(0.9); }
+    .date-nav .nav-label { font-size: 15px; font-weight: 600; min-width: 7em; text-align: center; }
+    .date-nav .today-btn { background: none; border: 1px solid var(--border); color: var(--text-secondary); padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; transition: 0.2s; }
+    .date-nav .today-btn:active { background: var(--card); }
+
+    .comp-section { background: var(--card); border-radius: 12px; padding: 12px; margin: 8px 0; }
+    .comp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .comp-total-label { font-size: 13px; color: var(--text-secondary); }
+    .comp-total-num { font-size: 24px; font-weight: 700; }
+    .comp-total-count { font-size: 12px; color: var(--text-secondary); }
+    .comp-diff { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 16px; font-size: 14px; font-weight: 600; }
+    .comp-diff.up { background: rgba(239,83,80,0.15); color: var(--danger); }
+    .comp-diff.down { background: rgba(102,187,106,0.15); color: var(--success); }
+    .comp-diff.zero { background: rgba(189,189,189,0.15); color: var(--text-secondary); }
+
+    .comp-cat-list { margin-top: 6px; }
+    .comp-cat-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .comp-cat-row:last-child { border-bottom: none; }
+    .comp-cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .comp-cat-name { font-size: 13px; min-width: 2.5em; }
+    .comp-cat-bar-track { flex: 1; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+    .comp-cat-bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+    .comp-cat-amt { font-size: 13px; min-width: 5em; text-align: right; font-weight: 500; }
+    .comp-cat-amt .up { color: var(--danger); }
+    .comp-cat-amt .down { color: var(--success); }
+    .comp-cat-amt .new { color: var(--accent); }
+    .comp-empty { color: var(--text-secondary); font-size: 13px; text-align: center; padding: 12px; }
+
+    .overview-bar { display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--card); border-radius: 12px; margin: 8px 0; }
+    .overview-item { flex: 1; text-align: center; }
+    .overview-item .val { font-size: 22px; font-weight: 700; }
+    .overview-item .lbl { font-size: 11px; color: var(--text-secondary); margin-top: 1px; }
+    .overview-item .val.income { color: var(--success); }
+    .overview-item .val.expense { color: var(--danger); }
+    .overview-item .val.net { color: var(--accent); }
+    .overview-divider { width: 1px; height: 40px; background: var(--border); flex-shrink: 0; }
+
+    .section-title { font-size: 14px; font-weight: 600; margin: 10px 0 4px; display: flex; align-items: center; gap: 6px; }
+    .section-title .tag { font-size: 11px; padding: 1px 6px; border-radius: 4px; }
+    .section-title .tag.income { background: rgba(76,175,80,0.2); color: var(--success); }
+    .section-title .tag.expense { background: rgba(239,83,80,0.2); color: var(--danger); }
+
+    .input-bar { display: flex; align-items: flex-end; gap: 8px; padding: 10px 12px; background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0; padding-bottom: calc(10px + env(safe-area-inset-bottom,0px)); }
+    .input-wrapper { flex: 1; display: flex; align-items: flex-end; background: var(--card); border-radius: 22px; border: 1px solid var(--border); transition: 0.2s; }
+    .input-wrapper:focus-within { border-color: var(--accent); }
+    .input-wrapper textarea { flex: 1; background: none; border: none; outline: none; color: var(--text); font-size: 15px; line-height: 1.5; padding: 10px 14px; resize: none; max-height: 120px; font-family: inherit; }
+    .input-wrapper textarea::placeholder { color: transparent; }
+    .mic-btn, .send-btn { background: none; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: 0.2s; }
+    .mic-btn:active, .send-btn:active { transform: scale(0.9); }
+    .mic-btn svg { width: 20px; height: 20px; fill: none; stroke: var(--text-secondary); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .mic-btn.recording { background: rgba(239,83,80,0.15); }
+    .mic-btn.recording svg { stroke: var(--danger); }
+    .mic-btn.recording .mic-base { display: none; }
+    .send-btn { color: var(--accent); }
+    .send-btn:disabled { opacity: 0.3; }
+    .send-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+
+    .sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; opacity: 0; pointer-events: none; transition: 0.3s; }
+    .sheet-overlay.open { opacity: 1; pointer-events: auto; }
+    .sheet { position: fixed; bottom: 0; left: 0; right: 0; z-index: 101; background: var(--surface); border-radius: 20px 20px 0 0; max-height: 75vh; overflow-y: auto; transform: translateY(100%); transition: 0.35s cubic-bezier(.32,.72,0,1); padding: 12px 16px calc(16px + env(safe-area-inset-bottom,0px)); }
+    .sheet.open { transform: translateY(0); }
+    .sheet-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 10px; }
+    .sheet h2 { font-size: 17px; margin-bottom: 4px; }
+    .sheet .close-sheet { float: right; background: none; border: none; color: var(--text-secondary); font-size: 20px; cursor: pointer; padding: 0 4px; }
+
+    .reset-btn { width: 100%; padding: 10px; margin-top: 12px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; color: var(--danger); font-size: 14px; cursor: pointer; }
+
+    .empty-state { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
+    .empty-state .icon { font-size: 48px; margin-bottom: 12px; opacity: 0.6; }
+    .empty-state p { font-size: 14px; line-height: 1.8; }
+    .empty-state .examples { margin-top: 16px; font-size: 13px; background: var(--card); border-radius: 12px; padding: 12px 16px; text-align: left; line-height: 2; }
+
+    .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--surface); border: 1px solid var(--border); padding: 8px 20px; border-radius: 20px; font-size: 14px; z-index: 200; opacity: 0; transition: 0.3s; pointer-events: none; white-space: nowrap; }
+    .toast.show { opacity: 1; }
+
+    .voice-indicator { display: none; align-items: center; gap: 10px; padding: 8px 12px; background: var(--card); border-radius: 12px; margin: 4px 0; font-size: 14px; }
+    .voice-indicator.active { display: flex; }
+    .voice-pulse { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); animation: pulse 1s infinite; }
+    @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.5); opacity: 0.5; } }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="header">
+      <h1>📒 记账助手</h1>
+      <div class="header-actions">
+        <button class="header-btn" id="summaryBtn" title="查看统计" aria-label="查看统计">📊</button>
+        <button class="header-btn" id="clearBtn" title="新的一天" aria-label="重置">🔄</button>
+      </div>
+    </header>
+
+    <div class="messages" id="messages" role="log" aria-label="聊天记录">
+      <div class="empty-state" id="emptyState">
+        <div class="icon">💰</div>
+        <p>支持支出和收入，语音记账更方便</p>
+        <div class="examples">
+          📝 试试这样说：<br>
+          「吃饭花了 35 元」<br>
+          「打车用了 20 块钱」<br>
+          「发工资了 8000 元」<br>
+          「收到稿费 500 块」
+        </div>
+      </div>
+    </div>
+
+    <div class="voice-indicator" id="voiceIndicator">
+      <div class="voice-pulse"></div>
+      <span>正在聆听...</span>
+    </div>
+
+    <div class="input-bar">
+      <div class="input-wrapper">
+        <textarea id="input" rows="1" placeholder="" aria-label="输入消费"></textarea>
+        <button class="mic-btn" id="micBtn" title="语音输入" aria-label="语音输入">
+          <svg viewBox="0 0 24 24" class="mic-base"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          <svg viewBox="0 0 24 24" style="display:none" class="mic-stop"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+        </button>
+      </div>
+      <button class="send-btn" id="sendBtn" title="发送" aria-label="发送" disabled>
+        <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="sheet-overlay" id="sheetOverlay"></div>
+  <div class="sheet" id="sheet" role="dialog" aria-label="消费统计">
+    <div class="sheet-handle"></div>
+    <button class="close-sheet" id="closeSheet" aria-label="关闭">✕</button>
+    <h2 id="sheetTitle">📊 财务统计</h2>
+    <div id="sheetContent"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ============================================================
+    //  Expense Categories (20)
+    // ============================================================
+    const CATEGORIES = [
+      { id: '餐饮',     keywords: ['吃','饭','餐','早','午','晚','零食','外卖','美食','餐厅','食堂','奶茶','咖啡','水果','饮料','水','菜','肉','蛋','奶','面包','泡面','火锅','烧烤','炸鸡','蛋糕','甜品','夜宵','下馆子','干饭','恰饭'], color: '#FF7043' },
+      { id: '交通',     keywords: ['打车','地铁','公交','加油','充电','停车','车票','机票','高铁','火车','共享单车','自行车','电动车','油费','过路费','轮渡'], color: '#42A5F5' },
+      { id: '娱乐',     keywords: ['电影','游戏','唱歌','KTV','玩','聚会','剧本杀','密室','棋牌','麻将','网吧','球','游乐园','景区','门票','演出','话剧','音乐节','露营'], color: '#AB47BC' },
+      { id: '学习',     keywords: ['书','课','学习','培训','课程','教育','报班','考研','考','试','文具','打印','资料','网课','教材','学费','考试','报名'], color: '#26A69A' },
+      { id: '购物',     keywords: ['超市','淘宝','京东','拼多多','快递','网购','下单','日用品','百货','便利店'], color: '#EC407A' },
+      { id: '住房',     keywords: ['房租','住宿','酒店','水电','物业','暖气','房贷','装修','家具','家电','维修','保洁','搬家','水费','电费','燃气','物业费'], color: '#7E57C2' },
+      { id: '医疗',     keywords: ['医院','药','看病','体检','牙','医','口罩','医保','挂号','手术','疫苗','中医','诊所'], color: '#EF5350' },
+      { id: '服饰',     keywords: ['衣服','鞋子','鞋','包','帽子','袜子','围巾','手套','穿搭','裤子','裙子','外套','羽绒服'], color: '#FF4081' },
+      { id: '美妆',     keywords: ['化妆品','护肤','防晒','面膜','口红','粉底','眼影','香水','化妆','美容','美发','理发','剪发','烫发','烫头','染发','美甲','纹眉'], color: '#FF80AB' },
+      { id: '数码',     keywords: ['手机','电脑','耳机','充电器','平板','手表','相机','镜头','键盘','鼠标','硬盘','U盘','音箱','显示器','配件'], color: '#00BCD4' },
+      { id: '运动',     keywords: ['健身','游泳','跑步','打球','瑜伽','跳绳','运动','体育','私教','健身房','羽毛球','篮球','足球'], color: '#4CAF50' },
+      { id: '社交',     keywords: ['送礼','红包','份子','随礼','礼物','请客','聚餐','AA','人情'], color: '#FFA726' },
+      { id: '宠物',     keywords: ['猫','狗','宠物','猫粮','狗粮','驱虫','疫苗','罐头','猫砂','遛狗','宠物医院'], color: '#8D6E63' },
+      { id: '育儿',     keywords: ['奶粉','尿不湿','玩具','早教','幼儿园','育儿','母婴','婴儿','宝宝','孩子'], color: '#F06292' },
+      { id: '通讯',     keywords: ['话费','流量','宽带','网费','手机卡','套餐'], color: '#78909C' },
+      { id: '保险',     keywords: ['保险','保费','社保','医保','养老','公积金','五险一金'], color: '#5C6BC0' },
+      { id: '旅行',     keywords: ['旅行','旅游','机票','酒店','民宿','景点','门票','度假','出国','护照','签证','行李箱','背包'], color: '#009688' },
+      { id: '烟酒',     keywords: ['烟','酒','香烟','啤酒','白酒','红酒','烟酒'], color: '#A1887F' },
+      { id: '居家',     keywords: ['家居','厨房','餐具','床上用品','毛巾','浴巾','收纳','装饰','绿植','花','洗衣','清洁','垃圾袋'], color: '#AED581' },
+      { id: '其他',     keywords: [], color: '#BDBDBD' },
+    ];
+
+    // ============================================================
+    //  Income Categories
+    // ============================================================
+    const INCOME_CATEGORIES = [
+      { id: '工资',     keywords: ['工资','薪水','月薪','底薪','基本工资','发工资','薪资'], color: '#4CAF50' },
+      { id: '奖金',     keywords: ['奖金','年终','绩效','提成','分红','项目奖','全勤'], color: '#66BB6A' },
+      { id: '兼职',     keywords: ['兼职','外快','副业','跑腿','接单','稿费','劳务'], color: '#81C784' },
+      { id: '投资',     keywords: ['收益','理财','利息','基金','股票','股息','租金'], color: '#A5D6A7' },
+      { id: '红包',     keywords: ['红包'], color: '#FFD54F' },
+      { id: '退款',     keywords: ['退款','返还','报销','赔偿'], color: '#FFF176' },
+      { id: '其他收入', keywords: ['收入','赚了','挣了','到账'], color: '#C5E1A5' },
+    ];
+
+    // ============================================================
+    //  Response messages
+    // ============================================================
+    const EXPENSE_RESPONSES = [
+      '✅ 记好啦！又为你的财务自由迈进一步～',
+      '💰 已入账！距离暴富又近了一天',
+      '📝 搞定！我已经偷偷记在小本本上了',
+      '收到收到～钱包又瘦了一点点 😅',
+      '🔖 已记录！今天花了不少，明天省着点哦',
+      '记好了！花钱一时爽，一直花钱一直爽 😎',
+      '✍️ 已登记！你的每一分钱都在这儿了',
+      'OK 啦～要不要看看统计？说不定有惊喜 📊',
+      '📋 已记录！猜猜你这个月哪项花最多？',
+      '记下了！你花钱的样子真潇洒 😄',
+      '入库成功！💰 今日账单又厚了一页',
+      '收到！这笔消费已加入你的账单豪华套餐 🧾',
+      '✅ 记好了！建议你少刷购物软件 😂',
+      '已记录在案！钱包余额 -¥XX，持续减少中',
+      '搞定！你的专属记账小助手已上线 🤖',
+      '📌 安排上了！每一笔都清清楚楚',
+      '记账成功！消费是一种态度，我欣赏你',
+      '收到～你这是在为国家GDP做贡献 🇨🇳',
+      '已记录！你尽管花，我尽管记，谁怕谁',
+      '✏️ 小本本已更新！今日消费又添一笔',
+      'OK！已加入你的花式花钱清单 📃',
+      '记好了！明天开始省着点……算了当我没说 🤐',
+      '收到！你的消费记录 +1，快乐也 +1',
+      '💪 搞定了！赚钱的动力是不是又增加了？',
+      '安排！这笔我给你记得明明白白、清清楚楚',
+      '没问题！已收入你的个人财务档案 📒',
+      '✅ 更新成功！资产减少了一丢丢，快乐增加了一大截',
+      'OK！这一笔，我替你记得死死的 🔖',
+      '搞定了！记账使我快乐，花钱使你快乐 😄',
+      '记好了！今天也是认真记账、认真生活的一天',
+      '已入库！距离财务自由还有……嗯，很长的路 🚶',
+      '收到～你尽管买，我要是记漏了算我输 🫡',
+      '✅ 登记成功！等你成了大富翁，记得回来感谢我',
+      'OK！这笔账我给你锁死了，谁也赖不掉 🔒',
+      '📥 笑纳了！你的账单又胖了一圈 🐷',
+      '记好啦！不准赖账，我可是有人证的 😉',
+      '收到！花钱如流水，记账如搬砖，今天我搬了 🧱',
+      '✅ 搞定！今天也在努力做一个合格的账房先生',
+      '已记录！你的消费版图又扩大了一块 🗺️',
+      'OK！这笔已经焊死在账本里了 🔧',
+      '💰 记好了！期待你成为下一个商业传奇',
+      '收到～你花钱，我记账，我们都有光明的未来 ✨',
+      '✅ 已登记！今日份的剁手指标已完成 ✔️',
+      '记好了！每一笔大额消费都是奋斗的号角 📯',
+      '📌 已标记！你的私人财务管家随时待命',
+    ];
+
+    const INCOME_RESPONSES = [
+      '💰 收到！进账的感觉真棒，离财务自由又近一步！',
+      '🎉 恭喜入账！赚钱小能手就是你',
+      '💵 已记录！今天也是收获满满的一天',
+      '🤑 入账成功！钱包又鼓起来啦',
+      '📈 收入 +1！这个月预算又宽裕了',
+      '✅ 记好了！会赚也会花才是真本事',
+      '收到～赚钱使我快乐，记账使我更快乐 😄',
+      '💪 又有一笔收入！距离人生目标更近了',
+      '✍️ 已登记！你的财富版图又扩大了一块',
+      '💰 进账成功！继续加油，未来可期',
+      '🎊 恭喜！这是努力的回响',
+      '📊 收入已记录！猜猜这个月能攒多少？',
+      'OK！这笔收入稳稳落袋 📥',
+      '💎 收到！每一分收入都值得被记住',
+      '✅ 入账！你值得拥有更好的生活',
+      '🌟 好棒！赚钱和记账都是好习惯',
+      '收到～你的小金库又充实了一点 ✨',
+      '📌 已标记！这是你努力工作的见证',
+      '🎯 又完成一笔收入！目标进度往前挪了一格',
+      '💰 记好了！期待你早日实现财富自由',
+    ];
+
+    const CANT_PARSE_RESPONSES = [
+      '🤔 我没找到金额呀，是不是忘记说多少钱了？',
+      '嗯…我只听到了寂寞，没听到金额 😅',
+      '亲，说个价钱呗～不然我不好记呀',
+      '光说买什么不说多少钱，你这是在为难我 😂',
+      '我听了个寂寞……金额在哪里呀？🔍',
+      '你说了什么？我只看到一串文字，没看到钱数 🤷',
+      '记账需要金额呀，比如「吃饭花了35元」试试？',
+      '💰 金额呢金额呢金额呢？重要的事情说三遍',
+    ];
+
+    function randomItem(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+    // ============================================================
+    //  NLP
+    // ============================================================
+    function detectIncome(text) {
+      for (const cat of INCOME_CATEGORIES) {
+        if (cat.keywords.some(k => text.includes(k))) return cat;
+      }
+      return INCOME_CATEGORIES.find(c => c.id === '其他收入');
+    }
+
+    function isIncomeText(text) {
+      return INCOME_CATEGORIES.some(cat =>
+        cat.keywords.some(k => text.includes(k))
+      );
+    }
+
+    function parseRecord(text) {
+      const amountMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:元|块钱|块|元钱|毛|分)/);
+      if (!amountMatch) return null;
+      const amount = parseFloat(amountMatch[1]);
+      if (isNaN(amount) || amount <= 0) return null;
+
+      const cleanText = text.replace(/(?:花了|用了|消费了|支付了|付了|交了|给了|充值|转了|发了|收到|赚了|挣了|收入|到账)?\d+(?:\.\d+)?\s*(?:元|块钱|块|元钱|毛|分)/, '').trim();
+
+      if (isIncomeText(text)) {
+        const cat = detectIncome(cleanText || text);
+        let desc = cleanText.replace(/^(?:今天|昨天|早上|中午|晚上|刚才|下午|上午|昨晚)/, '').trim();
+        if (!desc) {
+          const tp = text.match(/(今天|昨天|早上|中午|晚上|刚才|下午|上午|昨晚)/);
+          desc = (tp ? tp[1] : '') + cat.id;
+        }
+        return { type: 'income', amount, category: cat.id, color: cat.color, description: desc };
+      }
+
+      // expense
+      for (const cat of CATEGORIES) {
+        if (cat.id === '其他') continue;
+        if (cat.keywords.some(k => text.includes(k))) return parseExpenseResult(text, cleanText, cat, amount);
+      }
+      const defaultCat = CATEGORIES.find(c => c.id === '其他');
+      return parseExpenseResult(text, cleanText, defaultCat, amount);
+    }
+
+    function parseExpenseResult(text, cleanText, cat, amount) {
+      let desc = cleanText.replace(/^(?:今天|昨天|早上|中午|晚上|刚才|下午|上午|昨晚)/, '').trim();
+      if (!desc) {
+        const tp = text.match(/(今天|昨天|早上|中午|晚上|刚才|下午|上午|昨晚)/);
+        desc = (tp ? tp[1] : '') + cat.id;
+      }
+      return { type: 'expense', amount, category: cat.id, color: cat.color, description: desc };
+    }
+
+    // ============================================================
+    //  State
+    // ============================================================
+    let records = [];
+    let isRecording = false;
+    let recognition = null;
+    let viewDate = new Date();
+    let viewPeriod = 'month';
+
+    function loadData() {
+      try { records = JSON.parse(localStorage.getItem('budget_records')) || []; }
+      catch { records = []; }
+    }
+    function saveData() { localStorage.setItem('budget_records', JSON.stringify(records)); }
+
+    function getExpenseRecs(recs) { return recs.filter(r => r.type !== 'income'); }
+    function getIncomeRecs(recs) { return recs.filter(r => r.type === 'income'); }
+
+    function getTotals(recs) {
+      const map = {};
+      for (const cat of CATEGORIES) map[cat.id] = 0;
+      for (const r of recs) { map[r.category] = (map[r.category] || 0) + r.amount; }
+      return map;
+    }
+    function getIncomeTotals(recs) {
+      const map = {};
+      for (const cat of INCOME_CATEGORIES) map[cat.id] = 0;
+      for (const r of recs) { map[r.category] = (map[r.category] || 0) + r.amount; }
+      return map;
+    }
+    function getTotal(recs) { return recs.reduce((s, r) => s + r.amount, 0); }
+
+    // ============================================================
+    //  Date utilities
+    // ============================================================
+    function cloneDate(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+
+    function getDayKey(ts) { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+    function getMonthKey(ts) { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
+    function getYearKey(ts) { return String(new Date(ts).getFullYear()); }
+
+    function isSameDay(ts, date) { return getDayKey(ts) === getDayKey(date); }
+    function isSameMonth(ts, date) { return getMonthKey(ts) === getMonthKey(date); }
+    function isSameYear(ts, date) { return getYearKey(ts) === getYearKey(date); }
+
+    function filterByPeriod(records, date, period) {
+      if (period === 'day') return records.filter(r => isSameDay(r.timestamp, date));
+      if (period === 'month') return records.filter(r => isSameMonth(r.timestamp, date));
+      return records.filter(r => isSameYear(r.timestamp, date));
+    }
+
+    function getPrevDate(date, period) {
+      const d = cloneDate(date);
+      if (period === 'day') d.setDate(d.getDate() - 1);
+      else if (period === 'month') d.setMonth(d.getMonth() - 1);
+      else d.setFullYear(d.getFullYear() - 1);
+      return d;
+    }
+    function getNextDate(date, period) {
+      const d = cloneDate(date);
+      if (period === 'day') d.setDate(d.getDate() + 1);
+      else if (period === 'month') d.setMonth(d.getMonth() + 1);
+      else d.setFullYear(d.getFullYear() + 1);
+      return d;
+    }
+    function formatPeriodLabel(date, period) {
+      const y = date.getFullYear(), m = date.getMonth() + 1, d = date.getDate();
+      if (period === 'day') return `${y}年${m}月${d}日`;
+      if (period === 'month') return `${y}年${m}月`;
+      return `${y}年`;
+    }
+    function isToday(date) {
+      const t = new Date();
+      return date.getFullYear() === t.getFullYear() && date.getMonth() === t.getMonth() && date.getDate() === t.getDate();
+    }
+
+    // ============================================================
+    //  Comparison
+    // ============================================================
+    function getComparison(date, period) {
+      const curRecs = filterByPeriod(records, date, period);
+      const prevDate = getPrevDate(date, period);
+      const prevRecs = filterByPeriod(records, prevDate, period);
+
+      const curExpense = getExpenseRecs(curRecs);
+      const prevExpense = getExpenseRecs(prevRecs);
+      const curIncome = getIncomeRecs(curRecs);
+      const prevIncome = getIncomeRecs(prevRecs);
+
+      function buildCatInfo(cur, prev, catList) {
+        const curTotals = {};
+        const prevTotals = {};
+        for (const c of catList) { curTotals[c.id] = 0; prevTotals[c.id] = 0; }
+        for (const r of cur) curTotals[r.category] = (curTotals[r.category] || 0) + r.amount;
+        for (const r of prev) prevTotals[r.category] = (prevTotals[r.category] || 0) + r.amount;
+        return catList.map(c => ({
+          id: c.id, color: c.color,
+          current: curTotals[c.id] || 0,
+          prev: prevTotals[c.id] || 0,
+          diff: (curTotals[c.id] || 0) - (prevTotals[c.id] || 0)
+        })).filter(c => c.current > 0 || c.prev > 0);
+      }
+
+      const curExpTotal = getTotal(curExpense);
+      const prevExpTotal = getTotal(prevExpense);
+      const curIncTotal = getTotal(curIncome);
+      const prevIncTotal = getTotal(prevIncome);
+
+      return {
+        curRecs,
+        expense: {
+          cur: curExpTotal, prev: prevExpTotal,
+          diff: curExpTotal - prevExpTotal,
+          diffPct: prevExpTotal > 0 ? ((curExpTotal - prevExpTotal) / prevExpTotal) * 100 : (curExpTotal > 0 ? 100 : 0),
+          count: curExpense.length,
+          categories: buildCatInfo(curExpense, prevExpense, CATEGORIES)
+        },
+        income: {
+          cur: curIncTotal, prev: prevIncTotal,
+          diff: curIncTotal - prevIncTotal,
+          diffPct: prevIncTotal > 0 ? ((curIncTotal - prevIncTotal) / prevIncTotal) * 100 : (curIncTotal > 0 ? 100 : 0),
+          count: curIncome.length,
+          categories: buildCatInfo(curIncome, prevIncome, INCOME_CATEGORIES)
+        },
+        net: curIncTotal - curExpTotal
+      };
+    }
+
+    // ============================================================
+    //  UI refs
+    // ============================================================
+    const $ = s => document.querySelector(s);
+    const msgContainer = $('#messages');
+    const emptyState = $('#emptyState');
+    const input = $('#input');
+    const sendBtn = $('#sendBtn');
+    const micBtn = $('#micBtn');
+    const micBase = micBtn.querySelector('.mic-base');
+    const micStop = micBtn.querySelector('.mic-stop');
+    const voiceIndicator = $('#voiceIndicator');
+    const summaryBtn = $('#summaryBtn');
+    const clearBtn = $('#clearBtn');
+    const sheet = $('#sheet');
+    const sheetOverlay = $('#sheetOverlay');
+    const sheetContent = $('#sheetContent');
+    const closeSheet = $('#closeSheet');
+    const toastEl = $('#toast');
+
+    let toastTimer = null;
+    function showToast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2000);
+    }
+
+    function scrollToBottom() { setTimeout(() => { msgContainer.scrollTop = msgContainer.scrollHeight; }, 50); }
+
+    function formatTime(ts) {
+      const d = new Date(ts);
+      return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+    }
+
+    function addMessage(type, content, ts) {
+      emptyState.style.display = 'none';
+      const div = document.createElement('div');
+      div.className = `msg ${type}`;
+      const bubble = document.createElement('div');
+      bubble.className = 'msg-bubble';
+      if (typeof content === 'string') bubble.innerHTML = content;
+      else bubble.appendChild(content);
+      div.appendChild(bubble);
+      const time = document.createElement('div');
+      time.className = 'msg-time';
+      time.textContent = formatTime(ts);
+      div.appendChild(time);
+      msgContainer.appendChild(div);
+      scrollToBottom();
+    }
+
+    function buildRecordContent(parsed, ts) {
+      const isIncome = parsed.type === 'income';
+      const wrap = document.createElement('div');
+
+      // Reply
+      const reply = document.createElement('div');
+      reply.style.cssText = 'margin-bottom:6px;font-weight:' + (isIncome ? '600' : '400');
+      reply.textContent = randomItem(isIncome ? INCOME_RESPONSES : EXPENSE_RESPONSES);
+      wrap.appendChild(reply);
+
+      // Card
+      const detail = document.createElement('div');
+      const borderColor = isIncome ? 'rgba(76,175,80,0.3)' : 'var(--border)';
+      detail.style.cssText = 'display:flex;align-items:center;gap:10px;background:var(--card);padding:10px 14px;border-radius:10px;margin-bottom:6px;border:1px solid ' + borderColor;
+      const dot = document.createElement('span');
+      dot.style.cssText = 'width:10px;height:10px;border-radius:50%;background:' + parsed.color + ';flex-shrink:0';
+      const label = document.createElement('span');
+      label.style.cssText = 'font-size:11px;padding:1px 6px;border-radius:4px;' + (isIncome ? 'background:rgba(76,175,80,0.2);color:var(--success)' : 'background:rgba(239,83,80,0.2);color:var(--danger)');
+      label.textContent = isIncome ? '收入' : '支出';
+      const cat = document.createElement('span');
+      cat.style.cssText = 'font-size:13px;color:var(--text-secondary)';
+      cat.textContent = `${parsed.category} · ${parsed.description}`;
+      const amt = document.createElement('span');
+      amt.style.cssText = 'font-weight:700;font-size:18px;margin-left:auto;color:' + (isIncome ? 'var(--success)' : 'inherit');
+      amt.textContent = `${isIncome ? '+' : '-'}¥${parsed.amount.toFixed(2)}`;
+      detail.append(dot, label, cat, amt);
+      wrap.appendChild(detail);
+
+      // Running totals
+      const allExpense = getExpenseRecs(records);
+      const allIncome = getIncomeRecs(records);
+      const expTotal = getTotal(allExpense);
+      const incTotal = getTotal(allIncome);
+      const rt = document.createElement('div');
+      rt.style.cssText = 'font-size:13px;color:var(--text-secondary)';
+      rt.textContent = `📊 总支出 ¥${expTotal.toFixed(2)} · 总收入 ¥${incTotal.toFixed(2)} · 结余 ${(incTotal - expTotal) >= 0 ? '+' : ''}¥${(incTotal - expTotal).toFixed(2)}`;
+      wrap.appendChild(rt);
+      return wrap;
+    }
+
+    function addRecord(parsed, ts) {
+      records.push({ ...parsed, timestamp: ts || Date.now() });
+      saveData();
+      const content = buildRecordContent(parsed, ts || Date.now());
+      addMessage('assistant', content, ts || Date.now());
+    }
+
+    function handleInput(text) {
+      text = text.trim();
+      if (!text) return;
+      addMessage('user', text, Date.now());
+      const parsed = parseRecord(text);
+      if (!parsed) {
+        addMessage('assistant', randomItem(CANT_PARSE_RESPONSES), Date.now());
+        return;
+      }
+      addRecord(parsed);
+      input.value = '';
+      input.style.height = 'auto';
+      sendBtn.disabled = true;
+    }
+
+    // ============================================================
+    //  Render category comparison HTML
+    // ============================================================
+    function renderCatCompare(categories, total) {
+      let html = '';
+      const maxAmt = Math.max(...categories.map(c => Math.max(c.current, c.prev)), 1);
+      for (const cat of categories) {
+        const diff = cat.diff;
+        const diffCls = diff > 0 ? 'up' : (diff < 0 ? 'down' : '');
+        const sign = diff > 0 ? '+' : (diff < 0 ? '-' : '');
+        const barW = Math.max((Math.max(cat.current, cat.prev) / maxAmt) * 100, 0.5);
+        html += `<div class="comp-cat-row">`;
+        html += `<span class="comp-cat-dot" style="background:${cat.color}"></span>`;
+        html += `<span class="comp-cat-name">${cat.id}</span>`;
+        html += `<div class="comp-cat-bar-track"><div class="comp-cat-bar-fill" style="width:${barW}%;background:${cat.color}"></div></div>`;
+        html += `<span class="comp-cat-amt">`;
+        if (cat.current > 0 && cat.prev === 0) {
+          html += `<span class="new">NEW ¥${cat.current.toFixed(2)}</span>`;
+        } else if (diff !== 0) {
+          html += `<span>¥${cat.current.toFixed(2)} </span><span class="${diffCls}">${sign}¥${Math.abs(diff).toFixed(2)}</span>`;
+        } else {
+          html += `¥${cat.current.toFixed(2)}`;
+        }
+        html += `</span></div>`;
+      }
+      return html;
+    }
+
+    // ============================================================
+    //  Summary sheet
+    // ============================================================
+    function renderSummary() {
+      const comp = getComparison(viewDate, viewPeriod);
+      const curRecs = comp.curRecs;
+
+      if (records.length === 0) {
+        sheetContent.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:30px;">还没有记录<br>试试记一笔支出或收入吧！</p>';
+        return;
+      }
+
+      let html = '';
+
+      // Date nav
+      html += `<div class="date-nav">`;
+      html += `<div class="period-tabs"><button class="period-tab${viewPeriod==='day'?' active':''}" data-period="day">日</button><button class="period-tab${viewPeriod==='month'?' active':''}" data-period="month">月</button><button class="period-tab${viewPeriod==='year'?' active':''}" data-period="year">年</button></div>`;
+      html += `<div class="nav-center"><button class="nav-arrow" data-dir="prev">◀</button><span class="nav-label">${formatPeriodLabel(viewDate, viewPeriod)}</span><button class="nav-arrow" data-dir="next">▶</button></div>`;
+      html += `<button class="today-btn" id="todayJump">${isToday(viewDate) ? '今天' : '回今天'}</button></div>`;
+
+      if (curRecs.length === 0) {
+        html += `<div class="comp-section"><div class="comp-empty">该${viewPeriod==='day'?'天':viewPeriod==='month'?'月':'年'}暂无记录</div></div>`;
+      } else {
+        // Overview bar: income | expense | net
+        html += `<div class="overview-bar">`;
+        html += `<div class="overview-item"><div class="val income">¥${comp.income.cur.toFixed(2)}</div><div class="lbl">收入</div></div>`;
+        html += `<div class="overview-divider"></div>`;
+        html += `<div class="overview-item"><div class="val expense">¥${comp.expense.cur.toFixed(2)}</div><div class="lbl">支出</div></div>`;
+        html += `<div class="overview-divider"></div>`;
+        html += `<div class="overview-item"><div class="val net">${comp.net >= 0 ? '+' : ''}¥${comp.net.toFixed(2)}</div><div class="lbl">结余</div></div>`;
+        html += `</div>`;
+
+        // Income breakdown
+        if (comp.income.count > 0) {
+          const incDiffCls = comp.income.diff > 0 ? 'up' : (comp.income.diff < 0 ? 'down' : 'zero');
+          const incSign = comp.income.diff > 0 ? '+' : (comp.income.diff < 0 ? '-' : '');
+          html += `<div class="section-title"><span class="tag income">收入</span> ${comp.income.count}笔 <span style="font-size:12px;font-weight:400;color:var(--text-secondary)">较上${viewPeriod==='day'?'日':viewPeriod==='month'?'月':'年'} ${incSign}¥${Math.abs(comp.income.diff).toFixed(2)}</span></div>`;
+          if (comp.income.categories.length > 0) {
+            html += `<div class="comp-section"><div class="comp-cat-list">${renderCatCompare(comp.income.categories, comp.income.cur)}</div></div>`;
+          }
+        }
+
+        // Expense breakdown
+        if (comp.expense.count > 0) {
+          const expDiffCls = comp.expense.diff > 0 ? 'up' : (comp.expense.diff < 0 ? 'down' : 'zero');
+          const expSign = comp.expense.diff > 0 ? '+' : (comp.expense.diff < 0 ? '-' : '');
+          html += `<div class="section-title"><span class="tag expense">支出</span> ${comp.expense.count}笔 <span style="font-size:12px;font-weight:400;color:var(--text-secondary)">较上${viewPeriod==='day'?'日':viewPeriod==='month'?'月':'年'} ${expSign}¥${Math.abs(comp.expense.diff).toFixed(2)}</span></div>`;
+          if (comp.expense.categories.length > 0) {
+            html += `<div class="comp-section"><div class="comp-cat-list">${renderCatCompare(comp.expense.categories, comp.expense.cur)}</div></div>`;
+          }
+        }
+      }
+
+      // Distribution chart (all records in period)
+      if (curRecs.length > 0) {
+        const curExpense = getExpenseRecs(curRecs);
+        const curIncome = getIncomeRecs(curRecs);
+
+        if (curExpense.length > 0) {
+          const expTotals = getTotals(curExpense);
+          const expTotal = getTotal(curExpense);
+          html += `<div style="display:flex;align-items:center;gap:6px;margin:12px 0 6px"><span style="font-size:14px;font-weight:600">📊</span><span style="font-size:13px;color:var(--danger)">支出分布</span></div>`;
+          const sorted = CATEGORIES.filter(c => (expTotals[c.id] || 0) > 0).sort((a,b) => (expTotals[b.id]||0) - (expTotals[a.id]||0));
+          html += `<div class="summary-grid">`;
+          for (const cat of sorted) {
+            const amt = expTotals[cat.id], pct = (amt / expTotal) * 100;
+            html += `<div class="summary-item"><div class="num" style="color:${cat.color}">¥${amt.toFixed(2)}</div><div class="lbl">${cat.id} <span style="font-size:11px">${pct.toFixed(1)}%</span></div></div>`;
+          }
+          html += `<div class="summary-item summary-total"><div class="num">¥${expTotal.toFixed(2)}</div><div class="lbl">支出 · ${curExpense.length}笔</div></div></div>`;
+
+          // Chart bars
+          const maxCat = Math.max(...sorted.map(c => expTotals[c.id] || 0), 1);
+          html += `<div class="chart-section">`;
+          for (const cat of sorted) {
+            const amt = expTotals[cat.id], pct = (amt / expTotal) * 100, w = (amt / maxCat) * 100;
+            html += `<div class="chart-bar-row"><span class="lbl">${cat.id}</span><div class="bar-track"><div class="bar-fill" style="width:${w}%;background:${cat.color}"></div></div><span class="pct">${pct.toFixed(1)}%</span></div>`;
+          }
+          html += `</div>`;
+        }
+
+        if (curIncome.length > 0) {
+          const incTotals = getIncomeTotals(curIncome);
+          const incTotal = getTotal(curIncome);
+          html += `<div style="display:flex;align-items:center;gap:6px;margin:12px 0 6px"><span style="font-size:14px;font-weight:600">📊</span><span style="font-size:13px;color:var(--success)">收入分布</span></div>`;
+          const sorted = INCOME_CATEGORIES.filter(c => (incTotals[c.id] || 0) > 0).sort((a,b) => (incTotals[b.id]||0) - (incTotals[a.id]||0));
+          html += `<div class="summary-grid">`;
+          for (const cat of sorted) {
+            const amt = incTotals[cat.id], pct = (amt / incTotal) * 100;
+            html += `<div class="summary-item"><div class="num" style="color:${cat.color}">¥${amt.toFixed(2)}</div><div class="lbl">${cat.id}</div></div>`;
+          }
+          html += `<div class="summary-item summary-total"><div class="num" style="color:var(--success)">¥${incTotal.toFixed(2)}</div><div class="lbl">收入 · ${curIncome.length}笔</div></div></div>`;
+        }
+      }
+
+      html += `<button class="reset-btn" id="resetDataBtn" style="margin-top:12px">🗑️ 清除所有记录</button>`;
+
+      sheetContent.innerHTML = html;
+
+      // Events
+      sheetContent.querySelectorAll('.period-tab').forEach(tab => {
+        tab.addEventListener('click', () => { viewPeriod = tab.dataset.period; renderSummary(); });
+      });
+      sheetContent.querySelectorAll('.nav-arrow').forEach(btn => {
+        btn.addEventListener('click', () => {
+          viewDate = btn.dataset.dir === 'prev' ? getPrevDate(viewDate, viewPeriod) : getNextDate(viewDate, viewPeriod);
+          renderSummary();
+        });
+      });
+      const tj = sheetContent.querySelector('#todayJump');
+      if (tj) tj.addEventListener('click', () => { viewDate = new Date(); renderSummary(); });
+      const resetBtn = sheetContent.querySelector('#resetDataBtn');
+      if (resetBtn) resetBtn.addEventListener('click', () => {
+        if (confirm('确定要清除所有记录吗？')) {
+          records = []; saveData(); viewDate = new Date(); renderSummary();
+          msgContainer.querySelectorAll('.msg').forEach(el => el.remove());
+          emptyState.style.display = '';
+          showToast('已清除所有记录');
+        }
+      });
+    }
+
+    function openSheet() { renderSummary(); sheet.classList.add('open'); sheetOverlay.classList.add('open'); }
+    function closeSheetFn() { sheet.classList.remove('open'); sheetOverlay.classList.remove('open'); }
+    summaryBtn.addEventListener('click', openSheet);
+    closeSheet.addEventListener('click', closeSheetFn);
+    sheetOverlay.addEventListener('click', closeSheetFn);
+
+    // ============================================================
+    //  Clear / New Day
+    // ============================================================
+    clearBtn.addEventListener('click', () => {
+      if (records.length === 0) { showToast('暂无记录'); return; }
+      if (confirm('开始新的一天？之前的记录会保留，但聊天记录会清空。')) {
+        msgContainer.querySelectorAll('.msg').forEach(el => el.remove());
+        if (records.length > 0) {
+          const expTotal = getTotal(getExpenseRecs(records));
+          const incTotal = getTotal(getIncomeRecs(records));
+          const msg = document.createElement('div');
+          msg.className = 'msg assistant';
+          msg.innerHTML = `<div class="msg-bubble">📋 已开始新的一天！<br>之前共 ${records.length} 笔 · 收入 ¥${incTotal.toFixed(2)} · 支出 ¥${expTotal.toFixed(2)}<br><small style="color:var(--text-secondary)">点击 📊 查看详细统计</small></div>`;
+          const time = document.createElement('div'); time.className = 'msg-time'; time.textContent = formatTime(Date.now());
+          msg.appendChild(time); msgContainer.appendChild(msg); scrollToBottom();
+        } else {
+          emptyState.style.display = '';
+        }
+        showToast('已清空聊天记录');
+      }
+    });
+
+    // ============================================================
+    //  Send
+    // ============================================================
+    function autoResize() {
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+      sendBtn.disabled = !input.value.trim();
+    }
+    input.addEventListener('input', autoResize);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (input.value.trim()) handleInput(input.value); }
+    });
+    sendBtn.addEventListener('click', () => { if (input.value.trim()) handleInput(input.value); });
+
+    // ============================================================
+    //  Voice
+    // ============================================================
+    function initVoice() {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) { micBtn.style.display = 'none'; return; }
+      recognition = new SR();
+      recognition.lang = 'zh-CN';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.onresult = (e) => {
+        const t = e.results[0][0].transcript;
+        voiceIndicator.classList.remove('active'); isRecording = false;
+        micBtn.classList.remove('recording'); micBase.style.display = ''; micStop.style.display = 'none';
+        input.value = t; autoResize();
+        setTimeout(() => handleInput(t), 300);
+      };
+      recognition.onerror = (e) => {
+        voiceIndicator.classList.remove('active'); isRecording = false;
+        micBtn.classList.remove('recording'); micBase.style.display = ''; micStop.style.display = 'none';
+        if (e.error === 'no-speech') showToast('没有检测到语音');
+        else if (e.error !== 'aborted') showToast('语音识别出错');
+      };
+      recognition.onend = () => {
+        voiceIndicator.classList.remove('active'); isRecording = false;
+        micBtn.classList.remove('recording'); micBase.style.display = ''; micStop.style.display = 'none';
+      };
+    }
+    micBtn.addEventListener('click', () => {
+      if (!recognition) { showToast('当前浏览器不支持语音输入'); return; }
+      if (isRecording) { recognition.abort(); return; }
+      try {
+        recognition.start(); isRecording = true;
+        micBtn.classList.add('recording'); micBase.style.display = 'none'; micStop.style.display = '';
+        voiceIndicator.classList.add('active');
+      } catch { showToast('请允许麦克风权限'); }
+    });
+
+    // ============================================================
+    //  Init
+    // ============================================================
+    loadData();
+    initVoice();
+
+    if (records.length > 0) {
+      emptyState.style.display = 'none';
+      const expTotal = getTotal(getExpenseRecs(records));
+      const incTotal = getTotal(getIncomeRecs(records));
+      const msg = document.createElement('div');
+      msg.className = 'msg assistant';
+      msg.innerHTML = `<div class="msg-bubble">📋 已有 ${records.length} 笔记录<br>收入 ¥${incTotal.toFixed(2)} · 支出 ¥${expTotal.toFixed(2)} · 结余 ${(incTotal - expTotal) >= 0 ? '+' : ''}¥${(incTotal - expTotal).toFixed(2)}<br><small style="color:var(--text-secondary)">点击 📊 查看详细统计</small></div>`;
+      const time = document.createElement('div'); time.className = 'msg-time'; time.textContent = formatTime(Date.now());
+      msg.appendChild(time); msgContainer.appendChild(msg); scrollToBottom();
+    }
+
+    window.addEventListener('beforeunload', saveData);
+  </script>
+</body>
+</html>
