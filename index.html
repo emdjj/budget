@@ -341,12 +341,14 @@
     }
 
     function parseRecord(text) {
-      const amountMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:元|块钱|块|元钱|毛|分)/);
+      const amountMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:元|块钱|块|元钱|毛|分)/)
+        || text.match(/(\d+(?:\.\d+)?)\s*$/);
       if (!amountMatch) return null;
       const amount = parseFloat(amountMatch[1]);
       if (isNaN(amount) || amount <= 0) return null;
 
-      const cleanText = text.replace(/(?:花了|用了|消费了|支付了|付了|交了|给了|充值|转了|发了|收到|赚了|挣了|收入|到账)?\d+(?:\.\d+)?\s*(?:元|块钱|块|元钱|毛|分)/, '').trim();
+      const cleanText = text.replace(/(?:花了|用了|消费了|支付了|付了|交了|给了|充值|转了|发了|收到|赚了|挣了|收入|到账)?\d+(?:\.\d+)?\s*(?:元|块钱|块|元钱|毛|分)/, '')
+        .replace(/\d+(?:\.\d+)?\s*$/, '').trim();
 
       if (isIncomeText(text)) {
         const cat = detectIncome(cleanText || text);
