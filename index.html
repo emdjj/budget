@@ -865,6 +865,11 @@
     }
 
     window.addEventListener('beforeunload', saveData);
+
+    // Register Service Worker for offline
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/budget/sw.js');
+    }
   </script>
 </body>
 </html>
