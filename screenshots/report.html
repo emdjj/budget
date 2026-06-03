@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>数据库理论与技术 实验报告3-4</title>
+<style>
+body { font-family: 'Microsoft YaHei', SimSun, sans-serif; max-width: 1000px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+h1 { color: #1a1a2e; text-align: center; border-bottom: 3px solid #1a1a2e; padding-bottom: 10px; }
+h2 { color: #16213e; margin-top: 30px; background: #e8e8e8; padding: 8px 15px; border-left: 5px solid #0f3460; }
+h3 { color: #0f3460; margin-top: 20px; }
+.section { background: white; border-radius: 8px; padding: 20px; margin: 15px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); page-break-inside: avoid; }
+.sql { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 5px; font-family: Consolas, monospace; white-space: pre-wrap; overflow-x: auto; }
+.result { margin-top: 15px; }
+table { border-collapse: collapse; width: 100%; font-family: Consolas, monospace; font-size: 14px; }
+th { background: #0f3460; color: white; padding: 10px 12px; text-align: left; }
+td { padding: 8px 12px; border-bottom: 1px solid #ddd; }
+tr:nth-child(even) { background: #f8f8f8; }
+tr:hover { background: #e8f0fe; }
+.answer { background: #fffde7; border-left: 5px solid #fdd835; padding: 15px; margin-top: 15px; border-radius: 5px; }
+.note { color: #666; font-style: italic; }
+</style>
+</head>
+<body>
+<h1>数据库理论与技术 实验报告3-4</h1>
+<p style="text-align:center;color:#666;">学院：空间安全学院 | 班级：管控22-</p>
+
+<h2>基础数据查看</h2>
+
+<div class="section">
+<h3>学生表 (dbo.student)</h3>
+<div class="sql">SELECT sno, sname, spec, birthday, email, sex, scholarship FROM dbo.student</div>
+<div class="result"><table>
+<tr><th>sno</th><th>sname</th><th>spec</th><th>birthday</th><th>email</th><th>sex</th><th>scholarship</th></tr>
+<tr><td>9912301</td><td>张三</td><td>软件工程</td><td>2000-01-01</td><td>zs@test.com</td><td>男</td><td>1000.00</td></tr>
+<tr><td>9912302</td><td>李四</td><td>软件工程</td><td>2000-02-02</td><td>ls@test.com</td><td>男</td><td>500.00</td></tr>
+<tr><td>9912303</td><td>王五</td><td>计算机科学</td><td>2000-03-03</td><td>ww@test.com</td><td>男</td><td>800.00</td></tr>
+<tr><td>9912304</td><td>陈六</td><td>软件工程</td><td>2000-04-04</td><td>cl@test.com</td><td>女</td><td>600.00</td></tr>
+<tr><td>9912305</td><td>张七</td><td>网络工程</td><td>2000-05-05</td><td>zq@test.com</td><td>男</td><td>700.00</td></tr>
+<tr><td>9912306</td><td>赵秀</td><td>软件工程</td><td>2000-06-06</td><td>zx@test.com</td><td>女</td><td>.00</td></tr>
+<tr><td>9912307</td><td>孙九</td><td>网络工程</td><td>2000-07-07</td><td>sj@test.com</td><td>男</td><td>400.00</td></tr>
+<tr><td>9912308</td><td>周十</td><td>信息管理</td><td>2000-08-08</td><td>zs@test.com</td><td>女</td><td>.00</td></tr>
+</table>
+</div>
+</div>
+
+<div class="section">
+<h3>课程表 (dbo.course)</h3>
+<div class="sql">SELECT cno, cname, credit, teacher FROM dbo.course</div>
+<div class="result"><table>
+<tr><th>cno</th><th>cname</th><th>credit</th><th>teacher</th></tr>
+<tr><td>010101</td><td>数据结构</td><td>4</td><td>王老师</td></tr>
+<tr><td>010102</td><td>操作系统</td><td>3</td><td>李老师</td></tr>
+<tr><td>010103</td><td>数据库原理</td><td>3</td><td>陈老师</td></tr>
+<tr><td>010104</td><td>计算机网络</td><td>3</td><td>张老师</td></tr>
+<tr><td>010105</td><td>软件工程</td><td>4</td><td>刘老师</td></tr>
+<tr><td>010106</td><td>数据库理论与技术</td><td>4</td><td>陈老师</td></tr>
+<tr><td>010107</td><td>算法分析</td><td>3</td><td>赵老师</td></tr>
+</table>
+</div>
+</div>
+
+<div class="section">
+<h3>选课表 (dbo.student_course)</h3>
+<div class="sql">SELECT sno, cno, grade FROM dbo.student_course ORDER BY sno, cno</div>
+<div class="result"><table>
+<tr><th>sno</th><th>cno</th><th>grade</th></tr>
+<tr><td>9912301</td><td>010101</td><td>85.00</td></tr>
+<tr><td>9912301</td><td>010102</td><td>45.00</td></tr>
+<tr><td>9912301</td><td>010103</td><td>92.00</td></tr>
+<tr><td>9912301</td><td>010104</td><td>88.00</td></tr>
+<tr><td>9912301</td><td>010106</td><td>90.00</td></tr>
+<tr><td>9912301</td><td>010107</td><td>90.00</td></tr>
+<tr><td>9912302</td><td>010101</td><td>55.00</td></tr>
+<tr><td>9912302</td><td>010102</td><td>55.00</td></tr>
+<tr><td>9912302</td><td>010103</td><td>30.00</td></tr>
+<tr><td>9912302</td><td>010104</td><td>65.00</td></tr>
+<tr><td>9912302</td><td>010107</td><td>42.00</td></tr>
+<tr><td>9912303</td><td>010101</td><td>90.00</td></tr>
+<tr><td>9912303</td><td>010103</td><td>95.00</td></tr>
+<tr><td>9912303</td><td>010105</td><td>88.00</td></tr>
+<tr><td>9912303</td><td>010107</td><td>92.00</td></tr>
+<tr><td>9912304</td><td>010101</td><td>70.00</td></tr>
+<tr><td>9912304</td><td>010102</td><td>50.00</td></tr>
+<tr><td>9912304</td><td>010103</td><td>80.00</td></tr>
+<tr><td>9912304</td><td>010104</td><td>85.00</td></tr>
+<tr><td>9912305</td><td>010101</td><td>60.00</td></tr>
+<tr><td>9912305</td><td>010102</td><td>65.00</td></tr>
+<tr><td>9912305</td><td>010104</td><td>70.00</td></tr>
+<tr><td>9912305</td><td>010106</td><td>75.00</td></tr>
+<tr><td>9912305</td><td>010107</td><td>80.00</td></tr>
+<tr><td>9912306</td><td>010106</td><td>95.00</td></tr>
+<tr><td>9912306</td><td>010107</td><td>88.00</td></tr>
+<tr><td>9912307</td><td>010101</td><td>45.00</td></tr>
+<tr><td>9912307</td><td>010102</td><td>50.00</td></tr>
+<tr><td>9912308</td><td>010103</td><td>30.00</td></tr>
+<tr><td>9912308</td><td>010104</td><td>55.00</td></tr>
+<tr><td>9912308</td><td>010107</td><td>40.00</td></tr>
+</table>
+</div>
+</div>
+
+<h2>实验三：SQL Server 数据查询</h2>
+
+<div class="section">
+<h3>【实验三 第1题a】插入两条记录</h3>
+<div class="sql">INSERT INTO dbo.student_course VALUES ('9912301', '010106', 90);
+INSERT INTO dbo.student_course VALUES ('9912301', '010107', 90);</div>
+<p class="note">向 Student_Course 表插入两条记录</p>
+<div class="result"><table>
+<tr><th>sno</th><th>cno</th><th>grade</th></tr>
+<tr><td>9912301</td><td>010101</td><td>85.00</td></tr>
+<tr><td>9912301</td><td>010102</td><td>45.00</td></tr>
+<tr><td>9912301</td><td>010103</td><td>92.00</td></tr>
+<tr><td>9912301</td><td>010104</td><td>88.00</td></tr>
+<tr><td>9912301</td><td>010106</td><td>90.00</td></tr>
+<tr><td>9912301</td><td>010107</td><td>90.00</td></tr>
+</table>
+</div>
+</div>
+
+<div class="section">
+<h3>【实验三 第1题b】查询选修课程超过3门且成绩合格的学生学号</h3>
+<div class="sql">SELECT sno FROM dbo.student_course
+GROUP BY sno
+HAVING COUNT(*) &gt; 3 AND MIN(grade) &gt;= 60;</div>
+<div class="result"><table>
+<tr><th>sno</th></tr>
+<tr><td>9912303</td></tr>
+<tr><td>9912305</td></tr>
+</table>
+</div>
+</div>
+
+<div class="section">
+<h3>【实验三 第2题】创建S_avggrade表</h3>
+<div class="sql">SELECT sc.sno, s.sname, AVG(sc.grade) as avggrade
+INTO dbo.S_avggrade
+FROM dbo.student_course sc
+JOIN dbo.student s ON sc.sno = s.sno
+GROUP BY sc.sno, s.sname;</div>
+<p class="note">将查询结果存储到新表 S_avggrade(sno, sname, avggrade)</p>
+<div class="result"><table>
+<tr><th>sno</th><th>sname</th><th>avggrade</th></tr>
+<tr><td>9912301</td><td>张三</td><td>81.666666</td></tr>
+<tr><td>9912302</td><td>李四</td><td>49.400000</td></tr>
+<tr><td>9912303</td><td>王五</td><td>91.250000</td></tr>
+<tr><td>9912304</td><td>陈六</td><td>71.250000</td></tr>
+<tr><td>9912305</td><td>张七</td><td>70.000000</td></tr>
+<tr><td>9912306</td><td>赵秀</td><td>91.500000</td></tr>
+<tr><td>9912307</td><td>孙九</td><td>47.500000</td></tr>
+<tr><td>9912308</td><td>周十</td><td>41.666666</td></tr>
+</table>
+</div>
+</div>
+
+<div class="section">
+<h3>【实验三 第3题】查询每名学生的选课数量和总成绩</h3>
+<div class="sql">SELECT sc.sno, s.sname, COUNT(*) as course_count, SUM(sc.grade) as total_grade
+FROM dbo.student_course sc
+JOIN dbo.student s ON sc.sno = s.sno
+GROUP BY sc.sno, s.sname
+ORDER BY sc.sno ASC;</div>
+<p class="note">按学号升序排列</p>
+<div class="result"><table>
+<tr><th>sno</th><th>sname</th><th>course_count</th><th>total_grade</th></tr>
+<tr><td>9912301</td><td>张三</td><td>6</td><td>490.00</td></tr>
+<tr><td>9912302</td><td>李四</td><td>5</td><td>247.00</td></tr>
+<tr><td>9912303</td><td>王五</td><td>4</td><td>365.00</td></tr>
+<tr><td>9912304</td><td>陈六</td><td>4</td><td>285.00</td></tr>
+<tr><td>9912305</td><td>张七</td><td>5</td><td>350.00</td></tr>
+<tr><td>9912306</td><td>赵秀</td><td>2</td><td>183.00</td></tr>
+<tr><td>9912307</td><td>孙九</td><td>2</td><td>95.00</td></tr>
+<tr><td>9912308</td><td>周十</td><td>3</td><td>125.00</td></tr>
+</table>
+</div>
+</div>
+
+<div class="section">
+<h3>【实验三 第4题】查询姓李、陈、张的学生</h3>
+<div class="sql">SELECT sno, sname FROM dbo.student
+WHERE sname LIKE N'李%' OR sname LIKE N'陈%' OR sname LIKE N'张%';</div>
+<div class="result"><table>
+<tr><th>sno</th><th>sname</th></tr>
+<tr><td>9912301</td><td>张三</td></tr>
+<tr><td>9912302</td><td>李四</td></tr>
+<tr><td>9912304</td><td>陈六</td></tr>
+<tr><td>9912305</td><td>张七</td></tr>
+</table>
+</div>
+</div>
+
+<div class="section">
+<h3>【实验三 第5题】查询非软件专业成绩<60的学生</h3>
+<div class="sql">SELECT s.sno, s.sname, c.cname, sc.grade
+FROM dbo.student s
+JOIN dbo.student_course sc ON s.sno = sc.sno
+JOIN dbo.course c ON sc.cno = c.cno
+WHERE s.spec != N'软件工程' AND sc.grade &lt; 60;</div>
+<p class="note">显示学号、姓名、课程名称和成绩</p>
+<div class="result"><table>
+<tr><th>sno</th><th>sname</th><th>cname</th><th>grade</th></tr>
+<tr><td>9912307</td><td>孙九</td><td>数据结构</td><td>45.00</td></tr>
+<tr><td>9912307</td><td>孙九</td><td>操作系统</td><td>50.00</td></tr>
+<tr><td>9912308</td><td>周十</td><td>数据库原理</td><td>30.00</td></tr>
+<tr><td>9912308</td><td>周十</td><td>计算机网络</td><td>55.00</td></tr>
+<tr><td>9912308</td><td>周十</td><td>算法分析</td><td>40.00</td></tr>
+</table>
+</div>
+</div>
+
+<h2>实验四：SQL Server 视图</h2>
+
+<div class="section">
+<h3>【实验四 第1题】V2: 课程平均成绩<60的课程信息</h3>
+<div class="sql">CREATE VIEW V2 AS
+SELECT c.cno, c.cname, c.teacher
+FROM dbo.course c
+JOIN dbo.student_course sc ON c.cno = sc.cno
+GROUP BY c.cno, c.cname, c.teacher
+HAVING AVG(sc.grade) &lt; 60;</div>
+<div class="result"><table>
+<tr><th>cno</th><th>cname</th><th>teacher</th></tr>
+<tr><td>010102</td><td>操作系统</td><td>李老师</td></tr>
+</table>
+</div>
+</div>
+
+<div class="section">
+<h3>【实验四 第2题】V3: 成绩均合格的课程信息</h3>
+<div class="sql">CREATE VIEW V3 AS
+SELECT c.cno, c.cname, c.credit
+FROM dbo.course c
+WHERE c.cno NOT IN (
+    SELECT sc.cno FROM dbo.student_course sc
+    WHERE sc.grade &lt; 60
+);</div>
+<p class="note">所有学生成绩均>=60的课程（及格课程）</p>
+<div class="result"><table>
+<tr><th>cno</th><th>cname</th><th>credit</th></tr>
+<tr><td>010105</td><td>软件工程</td><td>4</td></tr>
+<tr><td>010106</td><td>数据库理论与技术</td><td>4</td></tr>
+</table>
+</div>
+</div>
+
+<div class="section">
+<h3>【实验四 第3题】V5: 基于V3查询平均成绩</h3>
+<div class="sql">CREATE VIEW V5 AS
+SELECT v.cno, v.cname, AVG(sc.grade) as avg_grade
+FROM V3 v
+JOIN dbo.student_course sc ON v.cno = sc.cno
+GROUP BY v.cno, v.cname;</div>
+<p class="note">在V3基础上创建，查询成绩均合格的课程的平均成绩</p>
+<div class="result"><table>
+<tr><th>cno</th><th>cname</th><th>avg_grade</th></tr>
+<tr><td>010105</td><td>软件工程</td><td>88.000000</td></tr>
+<tr><td>010106</td><td>数据库理论与技术</td><td>86.666666</td></tr>
+</table>
+</div>
+</div>
+
+<div class="section">
+<h3>【实验四 第4题】V4: 选修数据库理论与技术课程的学生</h3>
+<div class="sql">CREATE VIEW V4 AS
+SELECT s.sno, s.sname, sc.grade
+FROM dbo.student s
+JOIN dbo.student_course sc ON s.sno = sc.sno
+JOIN dbo.course c ON sc.cno = c.cno
+WHERE c.cname = N'数据库理论与技术';</div>
+<p class="note">按成绩降序排列</p>
+<div class="result"><table>
+<tr><th>sno</th><th>sname</th><th>grade</th></tr>
+<tr><td>9912306</td><td>赵秀</td><td>95.00</td></tr>
+<tr><td>9912301</td><td>张三</td><td>90.00</td></tr>
+<tr><td>9912305</td><td>张七</td><td>75.00</td></tr>
+</table>
+</div>
+</div>
+
+<div class="section">
+<h3>【实验四 第5题】V1: 课程号、课程名、平均成绩</h3>
+<div class="sql">CREATE VIEW V1 AS
+SELECT c.cno, c.cname, AVG(sc.grade) as avg_grade
+FROM dbo.course c
+JOIN dbo.student_course sc ON c.cno = sc.cno
+GROUP BY c.cno, c.cname;</div>
+<div class="result"><table>
+<tr><th>cno</th><th>cname</th><th>avg_grade</th></tr>
+<tr><td>010101</td><td>数据结构</td><td>67.500000</td></tr>
+<tr><td>010102</td><td>操作系统</td><td>53.000000</td></tr>
+<tr><td>010103</td><td>数据库原理</td><td>65.400000</td></tr>
+<tr><td>010104</td><td>计算机网络</td><td>72.600000</td></tr>
+<tr><td>010105</td><td>软件工程</td><td>88.000000</td></tr>
+<tr><td>010106</td><td>数据库理论与技术</td><td>86.666666</td></tr>
+<tr><td>010107</td><td>算法分析</td><td>72.000000</td></tr>
+</table>
+</div>
+</div>
+
+
+<div class="section">
+<h3>【实验四 第5题】V1是否能更新？</h3>
+<div class="answer">
+<strong>答：</strong>V1视图<strong>不能</strong>更新（即不能进行INSERT、UPDATE、DELETE操作）。<br><br>
+<strong>原因：</strong><br>
+1. V1视图中包含聚合函数 AVG()，聚合结果是由多行数据计算而来的。<br>
+2. V1视图使用了 GROUP BY 子句，每一行代表一组数据的聚合结果。<br>
+3. 视图中的每一行并不直接对应基表中的某一行，而是多行数据经过计算（聚合）后的汇总结果。<br>
+4. SQL Server规定，包含聚合函数、GROUP BY、DISTINCT等元素的视图为只读视图，系统无法确定如何将更新操作正确地映射回基表的原始行。<br>
+5. 因此，V1视图不可更新。
+</div>
+</div>
+
+
+<div style="text-align:center;margin-top:40px;padding:20px;color:#999;border-top:1px solid #ddd;">
+<p>数据库理论与技术 实验报告3-4 | 空间安全学院 管控22-</p>
+<p style="font-size:12px;">Generated on: 2026-05-27 10:42:05</p>
+</div>
+</body>
+</html>

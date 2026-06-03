@@ -1,0 +1,16 @@
+{
+  "name": "刷题练习",
+  "short_name": "刷题",
+  "description": "离线刷题练习 - 支持顺序/乱序/随机抽题/错题本/数据统计",
+  "start_url": "/quiz/index.html",
+  "display": "standalone",
+  "background_color": "#0f0f23",
+  "theme_color": "#1a1a2e",
+  "orientation": "portrait",
+  "categories": ["education", "productivity"],
+  "lang": "zh-CN",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
