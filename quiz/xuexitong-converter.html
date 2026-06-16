@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>学习通文本 → 刷题 JSON 转换器</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #0f0f23; color: #e8e8e8; padding: 20px; }
+    .app { max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 20px; margin-bottom: 12px; color: #4fc3f7; }
+    p { font-size: 13px; color: #a0a0b8; margin-bottom: 16px; line-height: 1.6; }
+    textarea { width: 100%; min-height: 200px; padding: 14px; background: #16213e; border: 1px solid #2a2a4a; border-radius: 12px; color: #e8e8e8; font-size: 14px; line-height: 1.7; font-family: inherit; resize: vertical; outline: none; }
+    textarea:focus { border-color: #4fc3f7; }
+    .btn-row { display: flex; gap: 10px; margin: 12px 0; flex-wrap: wrap; }
+    button { padding: 12px 24px; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+    button:active { transform: scale(0.97); }
+    .primary { background: #4fc3f7; color: #000; }
+    .secondary { background: #1a1a2e; border: 1px solid #2a2a4a; color: #e8e8e8; }
+    .stats { font-size: 13px; color: #a0a0b8; margin-bottom: 8px; }
+    .output { display: none; }
+    .output.show { display: block; }
+    #outputJson { background: #16213e; border: 1px solid #2a2a4a; border-radius: 12px; padding: 14px; font-size: 12px; line-height: 1.5; max-height: 400px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+    .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #1a1a2e; border: 1px solid #2a2a4a; padding: 8px 20px; border-radius: 20px; font-size: 14px; z-index: 100; opacity: 0; transition: 0.3s; pointer-events: none; }
+    .toast.show { opacity: 1; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin: 0 2px; }
+    .tag.single { background: rgba(79,195,247,0.2); color: #4fc3f7; }
+    .tag.multiple { background: rgba(255,167,38,0.2); color: #ffa726; }
+    .tag.truefalse { background: rgba(102,187,106,0.2); color: #66bb6a; }
+    .error { color: #ef5350; font-size: 13px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>📖 学习通 → 刷题 JSON 转换器</h1>
+    <p>从学习通作业页面全选复制（Ctrl+A → Ctrl+C），粘贴到下面，点转换即可</p>
+
+    <textarea id="inputText" placeholder="把学习通的题目文本粘贴到这里..."></textarea>
+
+    <div class="btn-row">
+      <button class="primary" id="convertBtn">🔄 转换为 JSON</button>
+      <button class="secondary" id="copyBtn" style="display:none">📋 复制 JSON</button>
+      <button class="secondary" id="downloadBtn" style="display:none">⬇️ 下载 .json</button>
+    </div>
+
+    <div id="stats" class="stats"></div>
+    <div id="error" class="error"></div>
+
+    <div class="output" id="outputArea">
+      <div id="outputJson"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const toastEl = document.getElementById('toast');
+    function showToast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      clearTimeout(toastEl._t);
+      toastEl._t = setTimeout(() => toastEl.classList.remove('show'), 2000);
+    }
+
+    document.getElementById('convertBtn').addEventListener('click', () => {
+      const text = document.getElementById('inputText').value.trim();
+      if (!text) { showToast('请先粘贴题目文本'); return; }
+
+      try {
+        const result = parseQuestions(text);
+        if (result.length === 0) {
+          document.getElementById('error').textContent = '❌ 未识别到题目，请检查格式';
+          document.getElementById('outputArea').classList.remove('show');
+          document.getElementById('stats').textContent = '';
+          document.getElementById('copyBtn').style.display = 'none';
+          document.getElementById('downloadBtn').style.display = 'none';
+          return;
+        }
+
+        const json = JSON.stringify(result, null, 2);
+        document.getElementById('outputJson').textContent = json;
+        document.getElementById('outputArea').classList.add('show');
+
+        const stats = {};
+        result.forEach(q => { stats[q.type] = (stats[q.type] || 0) + 1; });
+        const labels = { single: '单选题', multiple: '多选题', truefalse: '判断题' };
+        const statStr = Object.entries(stats).map(([k,v]) => `<span class="tag ${k}">${labels[k]||k}: ${v}题</span>`).join(' ');
+        document.getElementById('stats').innerHTML = `✅ 共提取 ${result.length} 题：${statStr}`;
+        document.getElementById('error').textContent = '';
+
+        document.getElementById('copyBtn').style.display = '';
+        document.getElementById('downloadBtn').style.display = '';
+
+        document.getElementById('copyBtn').onclick = () => {
+          navigator.clipboard.writeText(json).then(() => showToast('✅ 已复制 JSON')).catch(() => {
+            // fallback
+            const ta = document.createElement('textarea');
+            ta.value = json;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            showToast('✅ 已复制 JSON');
+          });
+        };
+
+        document.getElementById('downloadBtn').onclick = () => {
+          const blob = new Blob([json], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'questions.json';
+          a.click();
+          URL.revokeObjectURL(url);
+          showToast('⬇️ 已下载 questions.json');
+        };
+      } catch (e) {
+        document.getElementById('error').textContent = '❌ 转换失败：' + e.message;
+        document.getElementById('outputArea').classList.remove('show');
+      }
+    });
+
+    function parseQuestions(input) {
+      const blocks = input.split(/\n(?=\d+\.\s*[（(])/);
+      const questions = [];
+
+      for (const block of blocks) {
+        if (!/^\d+\.\s*[（(]/.test(block)) continue;
+        const text = block.trim();
+
+        // 提取题型
+        const typeMatch = text.match(/[（(]([^）)]+)[）)]/);
+        if (!typeMatch) continue;
+        const rawType = typeMatch[1];
+        let type = 'single';
+        if (rawType.includes('多选')) type = 'multiple';
+        else if (rawType.includes('判断')) type = 'truefalse';
+
+        // 提取正确答案行
+        const answerLine = text.split('\n').find(l => l.includes('正确答案'));
+        if (!answerLine) continue;
+
+        let answer;
+        if (type === 'multiple') {
+          const ansMatch = answerLine.match(/正确答案:([A-E]+):/);
+          if (ansMatch) {
+            answer = ansMatch[1].split('').map(ch => String(ch.charCodeAt(0) - 65));
+          } else { continue; }
+        } else if (type === 'truefalse') {
+          answer = /正确答案:对/.test(answerLine) ? '0' : '1';
+        } else {
+          const ansMatch = answerLine.match(/正确答案:([A-E]):/);
+          if (ansMatch) {
+            answer = String(ansMatch[1].charCodeAt(0) - 65);
+          } else { continue; }
+        }
+
+        // 提取问题文本
+        const qMatch = text.match(/\d+\.\s*[（(][^）)]+[）)]\s*([\s\S]*?)(?=[A-E]\.)/);
+        if (!qMatch) continue;
+        let question = qMatch[1]
+          .replace(/\n{2,}/g, '\n')
+          .replace(/\n/g, ' ')
+          .replace(/\s+/g, ' ')
+          .replace(/^[\d]+[\.、\s)]/, '')
+          .replace(/。。$/, '。')
+          .trim();
+
+        // 提取选项
+        const options = [];
+        const optLines = text.match(/[A-E]\.\s*([\s\S]*?)(?=(?:[A-E]\.|我的答案|$))/g);
+        if (optLines) {
+          for (const opt of optLines) {
+            const optText = opt
+              .replace(/^[A-E]\.\s*/, '')
+              .replace(/\n{2,}/g, '\n')
+              .replace(/\n/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim();
+            if (optText) options.push(optText);
+          }
+        }
+
+        // 判断题强制设选项
+        if (type === 'truefalse') {
+          options.length = 0;
+          options.push('正确', '错误');
+        }
+
+        if (question && options.length >= 2) {
+          questions.push({ type, question, options, answer, explanation: '' });
+        }
+      }
+
+      return questions;
+    }
+  </script>
+</body>
+</html>

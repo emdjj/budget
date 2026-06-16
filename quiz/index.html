@@ -194,6 +194,20 @@
     .reset-data-btn { width: 100%; padding: 12px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; color: var(--danger); font-size: 14px; margin-top: 8px; }
 
     /* ============================================================
+       Review Screen (背题模式)
+       ============================================================ */
+    .review-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; margin-bottom: 14px; animation: fadeIn 0.25s ease; }
+    .review-card .q-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .review-card .q-text { font-size: 16px; line-height: 1.7; margin-bottom: 14px; font-weight: 500; }
+    .review-card .review-options { display: flex; flex-direction: column; gap: 6px; }
+    .review-card .review-option { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 14px; line-height: 1.5; transition: 0.15s; }
+    .review-card .review-option .r-indicator { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 11px; font-weight: 700; transition: 0.15s; }
+    .review-card .review-option.multi .r-indicator { border-radius: 4px; }
+    .review-card .review-option.correct { border-color: var(--success); background: var(--correct-bg); }
+    .review-card .review-option.correct .r-indicator { border-color: var(--success); background: var(--success); color: #fff; }
+    .review-card .review-explanation { margin-top: 10px; padding: 10px 12px; background: rgba(79,195,247,0.06); border: 1px solid rgba(79,195,247,0.15); border-radius: 8px; font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+
+    /* ============================================================
        Import Screen
        ============================================================ */
     .import-zone { border: 2px dashed var(--border); border-radius: 16px; padding: 40px 20px; text-align: center; margin-bottom: 16px; transition: 0.2s; cursor: pointer; }
@@ -355,6 +369,10 @@
               <span class="icon">📊</span>
               <span>数据统计</span>
             </button>
+            <button class="action-btn" id="reviewNavBtn">
+              <span class="icon">📖</span>
+              <span>背题模式</span>
+            </button>
           </div>
         </div>
         <div class="home-summary" id="homeSummary"></div>
@@ -388,6 +406,16 @@
         <span class="mode-label">📊 数据统计</span>
       </div>
       <div class="scroll-area" id="statsContent"></div>
+    </div>
+
+    <!-- ============ SCREEN: REVIEW ============ -->
+    <div class="screen" id="screenReview">
+      <div class="practice-header">
+        <button class="back-btn" id="reviewBack">‹</button>
+        <span class="mode-label">📖 背题模式</span>
+        <span class="progress-text" id="reviewCount"></span>
+      </div>
+      <div class="scroll-area" id="reviewContent"></div>
     </div>
 
     <!-- ============ SCREEN: IMPORT ============ -->
@@ -1494,6 +1522,74 @@
     }
 
     // ============================================================
+    //  REVIEW (背题模式)
+    // ============================================================
+    async function renderReview() {
+      const bankId = state.activeBankId;
+      if (!bankId) { showToast('请先导入题库'); return; }
+
+      let questions = await getQuestions(bankId);
+      if (!questions || questions.length === 0) { showToast('题库为空'); return; }
+
+      // Filter by chapter if selected
+      if (state.selectedChapter && state.selectedChapter !== '全部') {
+        questions = questions.filter(q => q.chapter === state.selectedChapter);
+      }
+
+      // Sort by import order
+      questions.sort((a, b) => (a.order || 0) - (b.order || 0));
+
+      showScreen('review');
+      document.getElementById('reviewCount').textContent = `${questions.length} 题`;
+
+      const container = document.getElementById('reviewContent');
+      const typeLabels = { single: '单选题', multiple: '多选题', truefalse: '判断题' };
+
+      let html = '';
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
+        const isMulti = q.type === 'multiple';
+
+        // Build options with correct answer highlighted
+        let optionsHtml = '';
+        for (let j = 0; j < q.options.length; j++) {
+          const label = LABELS[j] || '';
+          const isCorrect = q.type === 'multiple'
+            ? Array.isArray(q.answer) && q.answer.includes(String(j))
+            : String(q.answer) === String(j);
+          const multiCls = isMulti ? 'multi' : '';
+
+          optionsHtml += `
+            <div class="review-option ${multiCls} ${isCorrect ? 'correct' : ''}">
+              <span class="r-indicator">${isCorrect ? '✓' : label}</span>
+              <span>${q.options[j]}</span>
+            </div>
+          `;
+        }
+
+        const explanation = q.explanation
+          ? `<div class="review-explanation">💡 ${q.explanation}</div>`
+          : '';
+
+        html += `
+          <div class="review-card fade-in">
+            <div class="q-header">
+              <span class="q-type-badge ${q.type}">${typeLabels[q.type] || '题目'}</span>
+              <span style="font-size:13px;color:var(--text-secondary);font-weight:600">第 ${i + 1} 题</span>
+            </div>
+            <div class="q-text">${q.question}</div>
+            <div class="review-options">${optionsHtml}</div>
+            ${explanation}
+          </div>
+        `;
+      }
+
+      container.innerHTML = html;
+      // Scroll to top
+      container.scrollTop = 0;
+    }
+
+    // ============================================================
     //  INIT
     // ============================================================
     async function init() {
@@ -1566,6 +1662,10 @@
 
       // Stats back
       document.getElementById('statsBack').addEventListener('click', goHome);
+
+      // Review
+      document.getElementById('reviewNavBtn').addEventListener('click', renderReview);
+      document.getElementById('reviewBack').addEventListener('click', goHome);
 
       // Import screen
       document.getElementById('importBack').addEventListener('click', goHome);
