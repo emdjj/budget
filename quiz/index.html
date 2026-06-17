@@ -1145,8 +1145,66 @@
       else state.sessionStats.wrong++;
       state.sessionStats.total++;
 
-      // Re-render to show feedback + nav buttons
-      renderQuestion();
+      // ---- In-place DOM update (no flash) ----
+      const isMulti = question.type === 'multiple';
+
+      // 1. Disable all options and mark correct/wrong
+      document.querySelectorAll('.option').forEach(el => {
+        el.classList.add('disabled');
+        const idx = el.dataset.index;
+        const wasSelected = isMulti
+          ? selected.includes(idx)
+          : selected === idx;
+        const isCorrectAnswer = isMulti
+          ? (Array.isArray(question.answer) && question.answer.includes(idx))
+          : question.answer === idx;
+        if (isCorrectAnswer) {
+          el.classList.add('correct');
+          if (wasSelected) el.classList.add('selected');
+        } else if (wasSelected) {
+          el.classList.add('wrong', 'selected');
+        }
+      });
+
+      // 2. Replace confirm button area with feedback + nav buttons
+      const confirmArea = document.getElementById('confirmArea');
+      const feedbackClass = correct ? 'correct' : 'wrong';
+      const resultIcon = correct ? '✅ 回答正确！' : '❌ 回答错误';
+      let correctAnsText = '';
+      if (!correct) {
+        const fmt = formatCorrectAnswer(question);
+        correctAnsText = `<div class="correct-answer">正确答案：${fmt}</div>`;
+      }
+      const explanationText = question.explanation
+        ? `<div class="explanation">💡 ${question.explanation}</div>` : '';
+      const total = state.questionQueue.length;
+      const idx = state.currentIndex;
+      const isLast = idx >= total - 1;
+      let navBtns = '<div style="display:flex;gap:8px;margin-top:12px">';
+      if (idx > 0) {
+        navBtns += `<button class="confirm-btn next" id="prevBtn" style="flex:1">⬅️ 上一题</button>`;
+      }
+      navBtns += isLast
+        ? `<button class="confirm-btn home" id="nextOrFinishBtn" style="flex:1">🏁 查看结果</button>`
+        : `<button class="confirm-btn next" id="nextOrFinishBtn" style="flex:1">➡️ 下一题</button>`;
+      navBtns += '</div>';
+
+      confirmArea.innerHTML = `
+        <div class="feedback ${feedbackClass} fade-in">
+          <div class="result-icon ${feedbackClass}">${resultIcon}</div>
+          ${correctAnsText}
+          ${explanationText}
+        </div>
+        ${navBtns}
+      `;
+
+      // 3. Wire up new buttons
+      const prevBtn = document.getElementById('prevBtn');
+      if (prevBtn) prevBtn.addEventListener('click', () => advanceQuestion(-1));
+      document.getElementById('nextOrFinishBtn').addEventListener('click', () => {
+        if (idx >= total - 1) showCompletion();
+        else advanceQuestion(1);
+      });
     }
 
     function advanceQuestion(direction) {
