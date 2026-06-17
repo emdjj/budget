@@ -638,9 +638,11 @@
       selectedChapter: '全部',
       mode: 'sequential',      // sequential | shuffled | random | wrong
       questionQueue: [],        // current session question IDs in order
+      questionData: [],         // cached questions for this session (with shuffled options if applicable)
       currentIndex: 0,          // index in questionQueue
       sessionStats: { correct: 0, wrong: 0, total: 0 },
       sessionStartTime: 0,
+      sessionAnswers: {},       // { questionId: { selected, correct } } for back navigation
       isAnswered: false,
       drawCount: 10,
       practiceBankId: null,
@@ -846,6 +848,28 @@
     // ============================================================
     //  Build Question Queue
     // ============================================================
+    function shuffleQuestionOptions(question) {
+      // Shuffle options for non-truefalse questions
+      if (question.type === 'truefalse') return question;
+
+      const q = { ...question, options: [...question.options] };
+      const indices = q.options.map((_, i) => i);
+      const shuffledOrder = shuffle(indices);
+
+      // Reorder options
+      q.options = shuffledOrder.map(i => q.options[i]);
+
+      // Remap answer
+      if (q.type === 'multiple' && Array.isArray(q.answer)) {
+        q.answer = q.answer.map(a => String(shuffledOrder.indexOf(parseInt(a))));
+      } else if (q.type === 'single') {
+        const oldIdx = parseInt(q.answer);
+        q.answer = String(shuffledOrder.indexOf(oldIdx));
+      }
+
+      return q;
+    }
+
     async function buildQueue(mode, bankId, drawCount, chapter) {
       let questions = await getQuestions(bankId);
       if (questions.length === 0) return [];
@@ -864,16 +888,24 @@
         pool = [...questions];
       }
 
+      let result;
       if (mode === 'sequential') {
-        return pool.sort((a, b) => (a.order || 0) - (b.order || 0));
+        result = pool.sort((a, b) => (a.order || 0) - (b.order || 0));
       } else if (mode === 'shuffled') {
-        return shuffle(pool);
+        result = shuffle(pool);
+        // Also shuffle each question's options
+        result = result.map(q => shuffleQuestionOptions(q));
       } else if (mode === 'random') {
         const shuffled = shuffle(pool);
         const count = Math.min(drawCount, shuffled.length);
-        return shuffled.slice(0, count);
+        result = shuffled.slice(0, count);
+      } else {
+        result = pool;
       }
-      return pool;
+
+      // Store the full question data in state for back-navigation
+      state.questionData = result;
+      return result;
     }
 
     // ============================================================
@@ -888,6 +920,7 @@
       state.drawCount = drawCount;
       state.sessionStats = { correct: 0, wrong: 0, total: 0 };
       state.sessionStartTime = Date.now();
+      state.sessionAnswers = {};
 
       const queue = await buildQueue(mode, bankId, drawCount, state.selectedChapter);
       if (queue.length === 0) {
@@ -920,19 +953,25 @@
         return;
       }
 
-      const qId = queue[idx];
-      const question = await idbGet('questions', qId);
+      // Use cached question data (which may have shuffled options)
+      const question = state.questionData && state.questionData[idx]
+        ? state.questionData[idx]
+        : await idbGet('questions', queue[idx]);
       if (!question) {
         showToast('题目加载失败');
         return;
       }
 
+      // Check if already answered in this session
+      const prevAnswer = state.sessionAnswers[question.id];
+
       // Progress
+      const answeredCount = Object.keys(state.sessionAnswers).length;
       document.getElementById('practiceProgress').textContent = `${idx + 1}/${total}`;
       document.getElementById('progressFill').style.width = `${((idx) / total) * 100}%`;
 
       const cardArea = document.getElementById('cardArea');
-      state.isAnswered = false;
+      state.isAnswered = !!prevAnswer;
 
       const typeLabels = { single: '单选题', multiple: '多选题', truefalse: '判断题' };
       const typeBadge = `<span class="q-type-badge ${question.type}">${typeLabels[question.type] || '单选题'}</span>`;
@@ -940,18 +979,61 @@
       let optionsHTML = '';
       const isMulti = question.type === 'multiple';
 
+      // Build option elements, pre-select if returning to an answered question
       for (let i = 0; i < question.options.length; i++) {
         const label = LABELS[i] || '';
         const multiCls = isMulti ? 'multi' : '';
+        const wasSelected = prevAnswer && (
+          isMulti
+            ? prevAnswer.selected.includes(String(i))
+            : prevAnswer.selected === String(i)
+        );
+        const wasCorrect = question.type === 'multiple'
+          ? Array.isArray(question.answer) && question.answer.includes(String(i))
+          : question.answer === String(i);
+        const extraCls = prevAnswer
+          ? (wasCorrect ? 'correct' : (wasSelected ? 'wrong' : ''))
+          : '';
+        const selectedCls = prevAnswer && wasSelected ? 'selected' : '';
         optionsHTML += `
-          <div class="option ${multiCls}" data-index="${i}" data-value="${i}">
+          <div class="option ${multiCls} ${extraCls} ${selectedCls} ${prevAnswer ? 'disabled' : ''}" data-index="${i}" data-value="${i}">
             <span class="indicator">${label}</span>
             <span class="opt-text">${question.options[i]}</span>
           </div>
         `;
       }
 
-      const confirmDisabled = question.type === 'multiple' ? 'disabled' : 'disabled';
+      // Build bottom area
+      let bottomHTML = '';
+      if (prevAnswer) {
+        // Already answered - show feedback + nav buttons
+        const feedbackClass = prevAnswer.correct ? 'correct' : 'wrong';
+        const resultIcon = prevAnswer.correct ? '✅ 回答正确！' : '❌ 回答错误';
+        const correctAnsText = !prevAnswer.correct
+          ? `<div class="correct-answer">正确答案：${formatCorrectAnswer(question)}</div>`
+          : '';
+        bottomHTML += `
+          <div class="feedback ${feedbackClass} fade-in">
+            <div class="result-icon ${feedbackClass}">${resultIcon}</div>
+            ${correctAnsText}
+            ${question.explanation ? `<div class="explanation">💡 ${question.explanation}</div>` : ''}
+          </div>
+        `;
+        // Nav buttons
+        bottomHTML += `<div style="display:flex;gap:8px;margin-top:12px">`;
+        if (idx > 0) {
+          bottomHTML += `<button class="confirm-btn next" id="prevBtn" style="flex:1">⬅️ 上一题</button>`;
+        }
+        const isLast = idx >= total - 1;
+        bottomHTML += isLast
+          ? `<button class="confirm-btn home" id="nextOrFinishBtn" style="flex:1">🏁 查看结果</button>`
+          : `<button class="confirm-btn next" id="nextOrFinishBtn" style="flex:1">➡️ 下一题</button>`;
+        bottomHTML += `</div>`;
+      } else {
+        // Not answered - show confirm button
+        const confirmDisabled = isMulti ? 'disabled' : 'disabled';
+        bottomHTML += `<button class="confirm-btn" id="confirmBtn" ${confirmDisabled}>${isMulti ? '确认选择 (已选 0 项)' : '请选择答案'}</button>`;
+      }
 
       cardArea.innerHTML = `
         <div class="question-card fade-in" id="questionCard">
@@ -962,7 +1044,7 @@
             ${optionsHTML}
           </div>
           <div class="confirm-area" id="confirmArea">
-            <button class="confirm-btn" id="confirmBtn" ${confirmDisabled}>${isMulti ? '确认选择 (已选 0 项)' : '请选择答案'}</button>
+            ${bottomHTML}
           </div>
           <div class="swipe-hint" id="swipeHint">← 左右滑动切换 →</div>
         </div>
@@ -971,45 +1053,58 @@
       // Store question data on card for access
       cardArea._question = question;
 
-      // Options click
-      let selectedValues = isMulti ? [] : null;
+      // If not answered yet, set up option click handlers
+      if (!prevAnswer) {
+        let selectedValues = isMulti ? [] : null;
 
-      document.querySelectorAll('.option').forEach(el => {
-        el.addEventListener('click', () => {
-          if (state.isAnswered) return;
-          const val = el.dataset.value;
-
-          if (isMulti) {
-            el.classList.toggle('selected');
-            const arr = selectedValues;
-            const vIdx = arr.indexOf(val);
-            if (vIdx > -1) arr.splice(vIdx, 1);
-            else arr.push(val);
-            document.getElementById('confirmBtn').textContent = `确认选择 (已选 ${arr.length} 项)`;
-            document.getElementById('confirmBtn').disabled = arr.length === 0;
-          } else {
-            document.querySelectorAll('.option').forEach(o => o.classList.remove('selected'));
-            el.classList.add('selected');
-            selectedValues = val;
-            document.getElementById('confirmBtn').textContent = '✓ 确认答案';
-            document.getElementById('confirmBtn').disabled = false;
-          }
+        document.querySelectorAll('.option').forEach(el => {
+          el.addEventListener('click', () => {
+            const val = el.dataset.value;
+            if (isMulti) {
+              el.classList.toggle('selected');
+              const arr = selectedValues;
+              const vIdx = arr.indexOf(val);
+              if (vIdx > -1) arr.splice(vIdx, 1);
+              else arr.push(val);
+              document.getElementById('confirmBtn').textContent = `确认选择 (已选 ${arr.length} 项)`;
+              document.getElementById('confirmBtn').disabled = arr.length === 0;
+            } else {
+              document.querySelectorAll('.option').forEach(o => o.classList.remove('selected'));
+              el.classList.add('selected');
+              selectedValues = val;
+              document.getElementById('confirmBtn').textContent = '✓ 确认答案';
+              document.getElementById('confirmBtn').disabled = false;
+            }
+          });
         });
-      });
 
-      // Confirm button
-      document.getElementById('confirmBtn').addEventListener('click', () => {
-        if (state.isAnswered) return;
-        if (isMulti && (!Array.isArray(selectedValues) || selectedValues.length === 0)) {
-          showToast('请至少选择一个选项');
-          return;
+        // Confirm button
+        const confirmBtn = document.getElementById('confirmBtn');
+        if (confirmBtn) {
+          confirmBtn.addEventListener('click', () => {
+            if (isMulti && (!Array.isArray(selectedValues) || selectedValues.length === 0)) {
+              showToast('请至少选择一个选项');
+              return;
+            }
+            if (!isMulti && selectedValues === null) {
+              showToast('请选择一个选项');
+              return;
+            }
+            submitAnswer(question, selectedValues);
+          });
         }
-        if (!isMulti && selectedValues === null) {
-          showToast('请选择一个选项');
-          return;
+      } else {
+        // Already answered - wire up nav buttons
+        const prevBtn = document.getElementById('prevBtn');
+        if (prevBtn) prevBtn.addEventListener('click', () => advanceQuestion(-1));
+        const nextBtn = document.getElementById('nextOrFinishBtn');
+        if (nextBtn) {
+          nextBtn.addEventListener('click', () => {
+            if (idx >= total - 1) showCompletion();
+            else advanceQuestion(1);
+          });
         }
-        submitAnswer(question, selectedValues);
-      });
+      }
 
       // Touch swipe setup
       setupSwipe();
@@ -1021,11 +1116,12 @@
     function submitAnswer(question, selected) {
       state.isAnswered = true;
 
-      // Determine selected array for multi
-      const selectedVal = question.type === 'multiple' ? selected : selected;
-      const correct = checkAnswer(question, selectedVal);
+      const correct = checkAnswer(question, selected);
 
-      // Record answer
+      // Save to session for back-navigation
+      state.sessionAnswers[question.id] = { selected, correct };
+
+      // Record answer to IndexedDB
       const record = {
         questionId: question.id,
         bankId: question.bankId,
@@ -1034,7 +1130,6 @@
         timestamp: Date.now(),
       };
       idbPut('answerRecords', record).then(() => {
-        // Update statistics cache after recording
         computeStatistics(question.bankId);
       });
 
@@ -1043,77 +1138,32 @@
       else state.sessionStats.wrong++;
       state.sessionStats.total++;
 
-      // Visual feedback
-      const options = document.querySelectorAll('.option');
-      options.forEach(el => {
-        el.classList.add('disabled');
-        const idx = parseInt(el.dataset.value);
-        const isSelected = question.type === 'multiple'
-          ? selected.includes(el.dataset.value)
-          : el.dataset.value === selected;
-        const isCorrectAns = question.type === 'multiple'
-          ? Array.isArray(question.answer) && question.answer.includes(el.dataset.value)
-          : el.dataset.value === question.answer;
-
-        if (isCorrectAns) el.classList.add('correct');
-        else if (isSelected && !correct) el.classList.add('wrong');
-      });
-
-      // Update confirm button to next button
-      const confirmArea = document.getElementById('confirmArea');
-      const isLast = state.currentIndex >= state.questionQueue.length - 1;
-
-      // Add feedback
-      const qText = question.question.length > 40 ? question.question.slice(0, 40) + '...' : question.question;
-      const feedbackClass = correct ? 'correct' : 'wrong';
-      const resultIcon = correct ? '✅ 回答正确！' : '❌ 回答错误';
-      const correctAnsText = !correct ? `<div class="correct-answer">正确答案：${formatCorrectAnswer(question)}</div>` : '';
-
-      const feedbackDiv = document.createElement('div');
-      feedbackDiv.className = `feedback ${feedbackClass} fade-in`;
-      feedbackDiv.innerHTML = `
-        <div class="result-icon ${feedbackClass}">${resultIcon}</div>
-        ${correctAnsText}
-        ${question.explanation ? `<div class="explanation">💡 ${question.explanation}</div>` : ''}
-      `;
-      confirmArea.appendChild(feedbackDiv);
-
-      // Replace confirm button
-      const confirmBtn = document.getElementById('confirmBtn');
-      if (isLast) {
-        confirmBtn.textContent = '🏁 查看结果';
-        confirmBtn.className = 'confirm-btn home';
-      } else {
-        confirmBtn.textContent = '➡️ 下一题';
-        confirmBtn.className = 'confirm-btn next';
-      }
-      confirmBtn.disabled = false;
-      confirmBtn.onclick = () => advanceQuestion();
+      // Re-render to show feedback + nav buttons
+      renderQuestion();
     }
 
-    function advanceQuestion() {
-      state.currentIndex++;
-      if (state.currentIndex >= state.questionQueue.length) {
+    function advanceQuestion(direction) {
+      direction = direction || 1;
+      const newIdx = state.currentIndex + direction;
+      if (newIdx < 0) return;
+      if (newIdx >= state.questionQueue.length) {
         showCompletion();
       } else {
+        state.currentIndex = newIdx;
         renderQuestion();
       }
     }
 
     function setupSwipe() {
       const cardArea = document.getElementById('cardArea');
-      // Remove old listeners by cloning? We'll use a flag approach.
 
       const onTouchStart = (e) => {
-        if (state.isAnswered) {
-          touchStartX = e.touches[0].clientX;
-          touchStartY = e.touches[0].clientY;
-          isSwiping = false;
-        }
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        isSwiping = false;
       };
 
       const onTouchMove = (e) => {
-        if (!state.isAnswered || !touchStartX) return;
         const dx = Math.abs(e.touches[0].clientX - touchStartX);
         const dy = Math.abs(e.touches[0].clientY - touchStartY);
         if (dx > dy && dx > 10) {
@@ -1123,24 +1173,32 @@
       };
 
       const onTouchEnd = (e) => {
-        if (!state.isAnswered || !isSwiping) {
+        if (!isSwiping) {
           touchStartX = 0;
           return;
         }
         touchEndX = e.changedTouches[0].clientX;
-        const diff = touchStartX - touchEndX;
+        const diff = touchStartX - touchEndX; // positive = swipe left, negative = swipe right
+
         if (Math.abs(diff) > 50) {
-          // Check if last question
-          if (state.currentIndex >= state.questionQueue.length - 1) {
-            showCompletion();
+          const card = document.getElementById('questionCard');
+          if (diff > 0) {
+            // Swipe LEFT → next question (only if answered or beyond first)
+            if (state.currentIndex < state.questionQueue.length - 1) {
+              if (card) {
+                card.style.animation = 'cardOutLeft 0.2s ease forwards';
+                setTimeout(() => advanceQuestion(1), 200);
+              } else { advanceQuestion(1); }
+            } else if (state.currentIndex >= state.questionQueue.length - 1) {
+              showCompletion();
+            }
           } else {
-            // Animate out
-            const card = document.getElementById('questionCard');
-            if (card) {
-              card.style.animation = diff > 0 ? 'cardOutLeft 0.2s ease forwards' : 'cardOutRight 0.2s ease forwards';
-              setTimeout(() => advanceQuestion(), 200);
-            } else {
-              advanceQuestion();
+            // Swipe RIGHT → previous question
+            if (state.currentIndex > 0) {
+              if (card) {
+                card.style.animation = 'cardOutRight 0.2s ease forwards';
+                setTimeout(() => advanceQuestion(-1), 200);
+              } else { advanceQuestion(-1); }
             }
           }
         }
@@ -1161,21 +1219,25 @@
       cardArea._lastTouchMove = onTouchMove;
       cardArea._lastTouchEnd = onTouchEnd;
 
-      // Keyboard: arrow right for next
+      // Keyboard shortcuts
       document._keyHandler = (e) => {
+        const practiceActive = document.querySelector('.screen.active#screenPractice');
+        if (!practiceActive) return;
+
         if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
-          if (state.isAnswered && document.querySelector('.screen.active#screenPractice')) {
-            e.preventDefault();
-            advanceQuestion();
-          }
+          e.preventDefault();
+          if (state.currentIndex < state.questionQueue.length - 1) advanceQuestion(1);
+          else showCompletion();
         }
-        // Enter to confirm answer when an option is selected
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (state.currentIndex > 0) advanceQuestion(-1);
+        }
         if (e.key === 'Enter') {
-          const practiceActive = document.querySelector('.screen.active#screenPractice');
-          if (practiceActive) {
-            const btn = document.getElementById('confirmBtn');
-            if (btn && !btn.disabled) btn.click();
-          }
+          const btn = document.getElementById('confirmBtn');
+          if (btn && !btn.disabled) btn.click();
+          const nextBtn = document.getElementById('nextOrFinishBtn');
+          if (nextBtn && !state.sessionAnswers) nextBtn.click();
         }
       };
       document.removeEventListener('keydown', document._lastKeyHandler);

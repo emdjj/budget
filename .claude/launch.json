@@ -12,6 +12,12 @@
       "runtimeExecutable": "C:\\Users\\Sin\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
       "runtimeArgs": ["-m", "http.server", "3001", "-d", "D:\\budget\\screenshots"],
       "port": 3001
+    },
+    {
+      "name": "vocab-app",
+      "runtimeExecutable": "C:\\Users\\Sin\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
+      "runtimeArgs": ["-m", "http.server", "3002", "-d", "D:\\budget\\vocab-app"],
+      "port": 3002
     }
   ]
 }
